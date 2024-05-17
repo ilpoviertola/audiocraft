@@ -47,6 +47,7 @@ def get_solver(cfg: omegaconf.DictConfig) -> StandardSolver:
     from .musicgen import MusicGenSolver
     from .diffusion import DiffusionSolver
     from .magnet import MagnetSolver, AudioMagnetSolver
+    from .v2agen import V2AGenSolver
 
     klass = {
         "compression": CompressionSolver,
@@ -57,6 +58,7 @@ def get_solver(cfg: omegaconf.DictConfig) -> StandardSolver:
         "lm": MusicGenSolver,  # backward compatibility
         "diffusion": DiffusionSolver,
         "sound_lm": AudioGenSolver,  # backward compatibility
+        "v2agen": V2AGenSolver,
     }[cfg.solver]
     return klass(cfg)  # type: ignore
 

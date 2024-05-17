@@ -20,3 +20,4 @@ from .conv import (
 from .lstm import StreamableLSTM
 from .seanet import SEANetEncoder, SEANetDecoder
 from .transformer import StreamingTransformer
+from .jepa import JEPAEncoderWrapper

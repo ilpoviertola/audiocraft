@@ -15,3 +15,4 @@ from .base import StandardSolver
 from .compression import CompressionSolver
 from .musicgen import MusicGenSolver
 from .diffusion import DiffusionSolver
+from .v2agen import V2AGenSolver

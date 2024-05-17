@@ -28,6 +28,7 @@ from torch.nn.utils.rnn import pad_sequence
 from .chroma import ChromaExtractor
 from .streaming import StreamingModule
 from .transformer import create_sin_embedding
+from .jepa import JEPAEncoderWrapper
 from ..data.audio import audio_read
 from ..data.audio_dataset import SegmentInfo
 from ..data.audio_utils import convert_audio
@@ -66,6 +67,15 @@ class JointEmbedCondition(tp.NamedTuple):
     sample_rate: tp.List[int]
     path: tp.List[tp.Optional[str]] = []
     seek_time: tp.List[tp.Optional[float]] = []
+
+
+class VideoCondition(tp.NamedTuple):
+    video: torch.Tensor
+    length: torch.Tensor
+    sample_rate: tp.List[int]
+    path: tp.List[tp.Optional[str]] = []
+    seek_time: tp.List[tp.Optional[float]] = []
+    clip_indices: tp.List[tp.Optional[tp.List[int]]] = []
 
 
 @dataclass
@@ -1210,6 +1220,236 @@ class CLAPEmbeddingConditioner(JointEmbeddingConditioner):
                 [i for i, xi in enumerate(x.text) if xi is None or xi == ""]
             )
         return embed, empty_idx
+
+
+class VideoConditioner(BaseConditioner):
+    def __init__(
+        self,
+        dim: int,
+        output_dim: int,
+        use_masking: bool,
+        device: tp.Union[torch.device, str],
+    ):
+        super().__init__(dim=dim, output_dim=output_dim)
+        self.device = device
+        self._use_masking = use_masking
+
+    def tokenize(self, x: VideoCondition) -> VideoCondition:
+        video, length, sample_rate, path, seek_time, clip_indices = x
+        assert length is not None
+        return VideoCondition(
+            video.to(self.device),
+            length.to(self.device),
+            sample_rate,
+            path,
+            seek_time,
+            clip_indices,
+        )
+
+    def _get_video_embedding(self, x: VideoCondition) -> torch.Tensor:
+        raise NotImplementedError()
+
+    def _downsampling_factor(self) -> int:
+        raise NotImplementedError()
+
+    def forward(self, x: VideoCondition) -> ConditionType:
+        video, lengths, *_ = x
+        with torch.no_grad():
+            embeds = self._get_video_embedding(x)
+        embeds = embeds.to(self.output_proj.weight)
+        embeds = self.output_proj(embeds)
+
+        if lengths is not None:
+            lengths = lengths / self._downsampling_factor()
+            mask = length_to_mask(lengths, max_len=embeds.shape[1]).int()  # type: ignore
+        else:
+            mask = torch.ones_like(embeds[..., 0])
+        embeds = embeds * mask.unsqueeze(-1)
+        return embeds, mask
+
+
+class VideoJepaConditioner(VideoConditioner):
+    def __init__(
+        self,
+        dim: int,
+        output_dim: int,
+        use_masking: bool,
+        device: tp.Union[torch.device, str],
+        name: str,
+        patch_size: int,
+        pretrain_folder: str,
+        checkpoint_name: str,
+        resolution: int,
+        duration: float,
+        sample_rate: float,
+        match_len_on_eval: bool = True,
+        autocast_dtype: tp.Optional[str] = "float32",
+        frame_dropout: float = 0.0,
+        normalize: bool = False,
+        finetune: bool = False,
+        attend_across_segments: bool = False,
+        tag: tp.Optional[str] = None,
+        use_pos_embed: bool = False,
+        max_frames: int = 1000,
+        use_sdpa: bool = True,
+        use_silu: bool = False,
+        tight_silu: bool = True,
+        uniform_power: bool = False,
+        tubelet_size: int = 2,
+        pretrain_frames_per_clip: int = 1,
+        checkpoint_key: str = "target_encoder",
+        use_spatial_aggregation: bool = True,
+        spatial_agg_type: str = "attention",
+        cache_path: tp.Optional[str] = None,
+    ):
+        super().__init__(dim, output_dim, use_masking, device)
+        self.name = name
+        finetune = False  # TODO: finetune model
+        self.frame_dropout = frame_dropout
+        if autocast_dtype is None or self.device == "cpu":
+            self.autocast = TorchAutocast(enabled=False)
+            if self.device != "cpu":
+                logger.warning("T5 has no autocast, this might lead to NaN")
+        else:
+            dtype = getattr(torch, autocast_dtype)
+            assert isinstance(dtype, torch.dtype)
+            logger.info(f"VJEPA will be evaluated with autocast as {autocast_dtype}")
+            self.autocast = TorchAutocast(
+                enabled=True, device_type=self.device, dtype=dtype
+            )
+        previous_level = logging.root.manager.disable
+        logging.disable(logging.ERROR)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                jepa_params = {
+                    "model_name": name,
+                    "patch_size": patch_size,
+                    "pretrain_folder": pretrain_folder,
+                    "checkpoint_name": checkpoint_name,
+                    "resolution": resolution,
+                    "attend_across_segments": attend_across_segments,
+                    "tag": tag,
+                    "use_pos_embed": use_pos_embed,
+                    "max_frames": max_frames,
+                    "use_sdpa": use_sdpa,
+                    "use_silu": use_silu,
+                    "tight_silu": tight_silu,
+                    "uniform_power": uniform_power,
+                    "tubelet_size": tubelet_size,
+                    "pretrain_frames_per_clip": pretrain_frames_per_clip,
+                    "checkpoint_key": checkpoint_key,
+                    "use_spatial_aggregation": use_spatial_aggregation,
+                    "spatial_agg_type": spatial_agg_type,
+                    "device": str(device),
+                }
+                self.jepa_tokenizer = JEPAEncoderWrapper(**jepa_params)  # type: ignore
+                jepa = JEPAEncoderWrapper(**jepa_params).train(mode=finetune)  # type: ignore
+            finally:
+                logging.disable(previous_level)
+        assert jepa.model.embed_dim == dim, "JEPA model dim should match dim"
+        assert Path(
+            f"{pretrain_folder}/{checkpoint_name}"
+        ).exists(), f"Pretrain folder {pretrain_folder} not found"
+
+        if finetune:
+            self.jepa = jepa
+        else:
+            self.__dict__["jepa"] = jepa.to(device)
+
+        self.match_len_on_eval = match_len_on_eval
+        if match_len_on_eval:
+            self._use_masking = False
+
+        self.duration = duration
+        self.sample_rate = sample_rate
+        self.embed_len = self._get_embed_len()
+
+        # self.normalize = normalize
+        # if self.normalize:
+        #     from torchvision.transforms.v2 import Normalize
+
+        #     self.normalizer = Normalize(
+        #         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        #     )
+
+        self.cache = None
+        if cache_path is not None:
+            self.cache = EmbeddingCache(
+                Path(cache_path) / "video",
+                self.device,
+                compute_embed_fn=self._get_full_jepa_for_cache,
+                extract_embed_fn=self._extract_jepa_chunk,
+            )
+
+    def _get_embed_len(self) -> int:
+        frames = torch.zeros(
+            (1, 3, int(self.sample_rate * self.duration), 224, 224), device=self.device
+        )
+        return self.jepa([[frames]]).shape[-2]
+
+    def _get_full_jepa_for_cache(
+        self, path: tp.Union[str, Path], x: VideoCondition, idx: int
+    ):
+        raise NotImplementedError("wip")
+
+    def _extract_jepa_chunk(self, full_jepa: torch.Tensor, x: VideoCondition, idx: int):
+        raise NotImplementedError("wip")
+
+    @torch.no_grad()
+    def _compute_video_embedding(
+        self,
+        video: torch.Tensor,
+        clip_indices: tp.List[tp.Optional[tp.List[int]]] = [],
+    ) -> torch.Tensor:
+        clip_indices = clip_indices if len(clip_indices) > 0 else None  # type: ignore
+        with self.autocast:
+            embed = self.jepa(video, clip_indices)
+            return embed
+
+    @torch.no_grad()
+    def _get_video_embedding(self, x: VideoCondition) -> torch.Tensor:
+        sampled_video: tp.Optional[torch.Tensor] = None
+        # TODO: implement sample_eval_videos
+
+        no_undefined_paths = all(p is not None for p in x.path)
+        no_nullified_cond = x.video.shape[-1] > 1
+        if sampled_video is not None:
+            embed = self._compute_video_embedding(sampled_video, x.clip_indices)
+        # TODO: cache stuff
+        else:
+            assert all(
+                sr == x.sample_rate for sr in x.sample_rate
+            ), "All sample rates in batch should be equal."
+            embed = self._compute_video_embedding(x.video, x.clip_indices)
+
+        if self.match_len_on_eval:
+            B, T, C = embed.shape
+            if T > self.embed_len:
+                embed = embed[:, : self.embed_len]
+                logger.debug(
+                    f"Embedding was truncated to match length! ({T} -> {embed.shape[1]})"
+                )
+            elif T < self.embed_len:
+                n_repeat = int(math.ceil(self.embed_len / T))
+                embed = embed.repeat(1, n_repeat, 1)
+                embed = embed[:, : self.embed_len]
+                logger.debug(
+                    f"Chroma was repeated to match length! ({T} -> {embed.shape[1]})"
+                )
+        return embed
+
+    def _downsampling_factor(self) -> int:
+        return int(self.sample_rate * self.duration / self.jepa.model.model.patch_size)
+
+    def tokenize(self, x: VideoCondition) -> VideoCondition:
+        x = super().tokenize(x)
+        # TODO: implement cache stuff
+        # no_undefined_paths = all(p is not None for p in x.path)
+        # if self.cache is not None and no_undefined_paths:
+        #     paths = [Path(p) for p in x.path if p is not None]
+        #     self.cache.populate_embed_cache(paths, x)
+        return x
 
 
 def dropout_condition(

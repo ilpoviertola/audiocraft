@@ -34,6 +34,7 @@ from ..modules.conditioners import (
     ConditioningProvider,
     LUTConditioner,
     T5Conditioner,
+    VideoJepaConditioner,
 )
 from .unet import DiffusionUnet
 from .. import quantization as qt
@@ -164,6 +165,10 @@ def get_conditioner_provider(
         elif model_type == "clap":
             conditioners[str(cond)] = CLAPEmbeddingConditioner(
                 output_dim=output_dim, device=device, **model_args
+            )
+        elif model_type == "jepa":
+            conditioners[str(cond)] = VideoJepaConditioner(
+                output_dim=output_dim, device=device, duration=duration, **model_args
             )
         else:
             raise ValueError(f"Unrecognized conditioning model: {model_type}")

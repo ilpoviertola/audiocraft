@@ -1,0 +1,41 @@
+# @package __global__
+
+classifier_free_guidance:
+  training_dropout: 0.1
+  inference_coef: 3.0
+
+attribute_dropout: {}
+
+fuser:
+  cross_attention_pos_emb: false
+  cross_attention_pos_emb_scale: 1
+  sum: []
+  prepend: []
+  cross: [video]
+  input_interpolate: []
+
+conditioners:
+  video:
+    model: jepa
+    jepa:
+      dim: 1024  # vit-large
+      name: vit_large
+      finetune: false
+      frame_dropout: 0.
+      normalize: false
+      patch_size: 16
+      pretrain_folder: /home/hdd/ilpo/checkpoints/jepa  # /scratch/project_2000936/viertoli/ckpts/jepa  # PUHTI
+      checkpoint_name: vitl16.pth.tar
+      resolution: 224
+      attend_across_segments: false
+      use_pos_embed: false
+      max_frames: 64
+      use_sdpa: true
+      use_silu: false
+      tight_silu: false
+      uniform_power: true
+      tubelet_size: 2
+      pretrain_frames_per_clip: 16
+      checkpoint_key: target_encoder
+      use_spatial_aggregation: true
+      spatial_agg_type: attention
