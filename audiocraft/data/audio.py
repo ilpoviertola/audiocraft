@@ -32,7 +32,7 @@ def _init_av():
     global _av_initialized
     if _av_initialized:
         return
-    logger = logging.getLogger('libav.mp3')
+    logger = logging.getLogger("libav.mp3")
     logger.setLevel(logging.ERROR)
     _av_initialized = True
 
@@ -62,14 +62,19 @@ def _soundfile_info(filepath: tp.Union[str, Path]) -> AudioFileInfo:
 def audio_info(filepath: tp.Union[str, Path]) -> AudioFileInfo:
     # torchaudio no longer returns useful duration informations for some formats like mp3s.
     filepath = Path(filepath)
-    if filepath.suffix in ['.flac', '.ogg']:  # TODO: Validate .ogg can be safely read with av_info
+    if filepath.suffix in [
+        ".flac",
+        ".ogg",
+    ]:  # TODO: Validate .ogg can be safely read with av_info
         # ffmpeg has some weird issue with flac.
         return _soundfile_info(filepath)
     else:
         return _av_info(filepath)
 
 
-def _av_read(filepath: tp.Union[str, Path], seek_time: float = 0, duration: float = -1.) -> tp.Tuple[torch.Tensor, int]:
+def _av_read(
+    filepath: tp.Union[str, Path], seek_time: float = 0, duration: float = -1.0
+) -> tp.Tuple[torch.Tensor, int]:
     """FFMPEG-based audio file reading using PyAV bindings.
     Soundfile cannot read mp3 and av_read is more efficient than torchaudio.
 
@@ -113,8 +118,12 @@ def _av_read(filepath: tp.Union[str, Path], seek_time: float = 0, duration: floa
         return f32_pcm(wav), sr
 
 
-def audio_read(filepath: tp.Union[str, Path], seek_time: float = 0.,
-               duration: float = -1., pad: bool = False) -> tp.Tuple[torch.Tensor, int]:
+def audio_read(
+    filepath: tp.Union[str, Path],
+    seek_time: float = 0.0,
+    duration: float = -1.0,
+    pad: bool = False,
+) -> tp.Tuple[torch.Tensor, int]:
     """Read audio by picking the most appropriate backend tool based on the audio format.
 
     Args:
@@ -126,13 +135,20 @@ def audio_read(filepath: tp.Union[str, Path], seek_time: float = 0.,
         tuple of torch.Tensor, int: Tuple containing audio data and sample rate.
     """
     fp = Path(filepath)
-    if fp.suffix in ['.flac', '.ogg']:  # TODO: check if we can safely use av_read for .ogg
+    if fp.suffix in [
+        ".flac",
+        ".ogg",
+    ]:  # TODO: check if we can safely use av_read for .ogg
         # There is some bug with ffmpeg and reading flac
         info = _soundfile_info(filepath)
         frames = -1 if duration <= 0 else int(duration * info.sample_rate)
         frame_offset = int(seek_time * info.sample_rate)
-        wav, sr = soundfile.read(filepath, start=frame_offset, frames=frames, dtype=np.float32)
-        assert info.sample_rate == sr, f"Mismatch of sample rates {info.sample_rate} {sr}"
+        wav, sr = soundfile.read(
+            filepath, start=frame_offset, frames=frames, dtype=np.float32
+        )
+        assert (
+            info.sample_rate == sr
+        ), f"Mismatch of sample rates {info.sample_rate} {sr}"
         wav = torch.from_numpy(wav).t().contiguous()
         if len(wav.shape) == 1:
             wav = torch.unsqueeze(wav, 0)
@@ -144,26 +160,53 @@ def audio_read(filepath: tp.Union[str, Path], seek_time: float = 0.,
     return wav, sr
 
 
-def _piping_to_ffmpeg(out_path: tp.Union[str, Path], wav: torch.Tensor, sample_rate: int, flags: tp.List[str]):
+def _piping_to_ffmpeg(
+    out_path: tp.Union[str, Path],
+    wav: torch.Tensor,
+    sample_rate: int,
+    flags: tp.List[str],
+):
     # ffmpeg is always installed and torchaudio is a bit unstable lately, so let's bypass it entirely.
     assert wav.dim() == 2, wav.shape
-    command = [
-        'ffmpeg',
-        '-loglevel', 'error',
-        '-y', '-f', 'f32le', '-ar', str(sample_rate), '-ac', str(wav.shape[0]),
-        '-i', '-'] + flags + [str(out_path)]
+    command = (
+        [
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "f32le",
+            "-ar",
+            str(sample_rate),
+            "-ac",
+            str(wav.shape[0]),
+            "-i",
+            "-",
+        ]
+        + flags
+        + [str(out_path)]
+    )
     input_ = f32_pcm(wav).t().detach().cpu().numpy().tobytes()
     sp.run(command, input=input_, check=True)
 
 
-def audio_write(stem_name: tp.Union[str, Path],
-                wav: torch.Tensor, sample_rate: int,
-                format: str = 'wav', mp3_rate: int = 320, ogg_rate: tp.Optional[int] = None,
-                normalize: bool = True, strategy: str = 'peak', peak_clip_headroom_db: float = 1,
-                rms_headroom_db: float = 18, loudness_headroom_db: float = 14,
-                loudness_compressor: bool = False,
-                log_clipping: bool = True, make_parent_dir: bool = True,
-                add_suffix: bool = True) -> Path:
+def audio_write(
+    stem_name: tp.Union[str, Path],
+    wav: torch.Tensor,
+    sample_rate: int,
+    format: str = "wav",
+    mp3_rate: int = 320,
+    ogg_rate: tp.Optional[int] = None,
+    normalize: bool = True,
+    strategy: str = "peak",
+    peak_clip_headroom_db: float = 1,
+    rms_headroom_db: float = 18,
+    loudness_headroom_db: float = 14,
+    loudness_compressor: bool = False,
+    log_clipping: bool = True,
+    make_parent_dir: bool = True,
+    add_suffix: bool = True,
+) -> Path:
     """Convenience function for saving audio to disk. Returns the filename the audio was written to.
 
     Args:
@@ -196,28 +239,36 @@ def audio_write(stem_name: tp.Union[str, Path],
     elif wav.dim() > 2:
         raise ValueError("Input wav should be at most 2 dimension.")
     assert wav.isfinite().all()
-    wav = normalize_audio(wav, normalize, strategy, peak_clip_headroom_db,
-                          rms_headroom_db, loudness_headroom_db, loudness_compressor,
-                          log_clipping=log_clipping, sample_rate=sample_rate,
-                          stem_name=str(stem_name))
-    if format == 'mp3':
-        suffix = '.mp3'
-        flags = ['-f', 'mp3', '-c:a', 'libmp3lame', '-b:a', f'{mp3_rate}k']
-    elif format == 'wav':
-        suffix = '.wav'
-        flags = ['-f', 'wav', '-c:a', 'pcm_s16le']
-    elif format == 'ogg':
-        suffix = '.ogg'
-        flags = ['-f', 'ogg', '-c:a', 'libvorbis']
+    wav = normalize_audio(
+        wav,
+        normalize,
+        strategy,
+        peak_clip_headroom_db,
+        rms_headroom_db,
+        loudness_headroom_db,
+        loudness_compressor,
+        log_clipping=log_clipping,
+        sample_rate=sample_rate,
+        stem_name=str(stem_name),
+    )
+    if format == "mp3":
+        suffix = ".mp3"
+        flags = ["-f", "mp3", "-c:a", "libmp3lame", "-b:a", f"{mp3_rate}k"]
+    elif format == "wav":
+        suffix = ".wav"
+        flags = ["-f", "wav", "-c:a", "pcm_s16le"]
+    elif format == "ogg":
+        suffix = ".ogg"
+        flags = ["-f", "ogg", "-c:a", "libvorbis"]
         if ogg_rate is not None:
-            flags += ['-b:a', f'{ogg_rate}k']
-    elif format == 'flac':
-        suffix = '.flac'
-        flags = ['-f', 'flac']
+            flags += ["-b:a", f"{ogg_rate}k"]
+    elif format == "flac":
+        suffix = ".flac"
+        flags = ["-f", "flac"]
     else:
         raise RuntimeError(f"Invalid format {format}. Only wav or mp3 are supported.")
     if not add_suffix:
-        suffix = ''
+        suffix = ""
     path = Path(str(stem_name) + suffix)
     if make_parent_dir:
         path.parent.mkdir(exist_ok=True, parents=True)

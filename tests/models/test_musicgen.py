@@ -12,8 +12,8 @@ from audiocraft.models import MusicGen
 
 class TestMusicGenModel:
     def get_musicgen(self):
-        mg = MusicGen.get_pretrained(name='debug', device='cpu')
-        mg.set_generation_params(duration=2.0, extend_stride=2.)
+        mg = MusicGen.get_pretrained(name="debug", device="cpu")
+        mg.set_generation_params(duration=2.0, extend_stride=2.0)
         return mg
 
     def test_base(self):
@@ -34,32 +34,29 @@ class TestMusicGenModel:
         assert list(wav.shape) == [3, 1, 64000]
 
         prompt = torch.randn(2, 1, 32000)
-        wav = mg.generate_continuation(
-            prompt, 32000, ['youpi', 'lapin dort'])
+        wav = mg.generate_continuation(prompt, 32000, ["youpi", "lapin dort"])
         assert list(wav.shape) == [2, 1, 64000]
 
         prompt = torch.randn(2, 1, 32000)
         with pytest.raises(AssertionError):
             wav = mg.generate_continuation(
-                prompt, 32000, ['youpi', 'lapin dort', 'one too many'])
+                prompt, 32000, ["youpi", "lapin dort", "one too many"]
+            )
 
     def test_generate(self):
         mg = self.get_musicgen()
-        wav = mg.generate(
-            ['youpi', 'lapin dort'])
+        wav = mg.generate(["youpi", "lapin dort"])
         assert list(wav.shape) == [2, 1, 64000]
 
     def test_generate_long(self):
         mg = self.get_musicgen()
-        mg.max_duration = 3.
-        mg.set_generation_params(duration=4., extend_stride=2.)
-        wav = mg.generate(
-            ['youpi', 'lapin dort'])
+        mg.max_duration = 3.0
+        mg.set_generation_params(duration=4.0, extend_stride=2.0)
+        wav = mg.generate(["youpi", "lapin dort"])
         assert list(wav.shape) == [2, 1, 32000 * 4]
 
     def test_generate_two_step_cfg(self):
         mg = self.get_musicgen()
-        mg.set_generation_params(duration=2.0, extend_stride=2., two_step_cfg=True)
-        wav = mg.generate(
-            ['youpi', 'lapin dort'])
+        mg.set_generation_params(duration=2.0, extend_stride=2.0, two_step_cfg=True)
+        wav = mg.generate(["youpi", "lapin dort"])
         assert list(wav.shape) == [2, 1, 64000]

@@ -71,7 +71,9 @@ class TestDelayedPatternProvider:
                 assert code.t == max(0, s - code.q - 1)
 
     @pytest.mark.parametrize("timesteps", [8, 16, 100])
-    @pytest.mark.parametrize("delay", [[0, 1, 2, 3], [0, 1, 1, 1], [0, 3, 3, 3], [0, 3]])
+    @pytest.mark.parametrize(
+        "delay", [[0, 1, 2, 3], [0, 1, 1, 1], [0, 3, 3, 3], [0, 3]]
+    )
     def test_pattern_max_delay(self, timesteps: int, delay: list):
         provider = DelayedPatternProvider(len(delay), delay)
         pattern = provider.get_pattern(timesteps)
@@ -104,44 +106,56 @@ class TestUnrolledPatternProvider:
 
 class TestPattern:
 
-    def ref_build_pattern_sequence(self, z: torch.Tensor, pattern: Pattern, special_token: int):
+    def ref_build_pattern_sequence(
+        self, z: torch.Tensor, pattern: Pattern, special_token: int
+    ):
         """Reference method to build the sequence from the pattern without using fancy scatter."""
         bs, n_q, T = z.shape
         z = z.cpu().numpy()
         assert n_q == pattern.n_q
         assert T <= pattern.timesteps
-        inp = torch.full((bs, n_q, len(pattern.layout)), special_token, dtype=torch.long).numpy()
+        inp = torch.full(
+            (bs, n_q, len(pattern.layout)), special_token, dtype=torch.long
+        ).numpy()
         inp[:] = special_token
         for s, v in enumerate(pattern.layout):
-            for (t, q) in v:
+            for t, q in v:
                 if t < T:
                     inp[:, q, s] = z[:, q, t]
         return torch.from_numpy(inp)
 
-    def ref_revert_pattern_sequence(self, z: torch.Tensor, pattern: Pattern, special_token: int):
+    def ref_revert_pattern_sequence(
+        self, z: torch.Tensor, pattern: Pattern, special_token: int
+    ):
         """Reference method to revert the sequence from the pattern without using fancy scatter."""
         z = z.cpu().numpy()
         bs, n_q, S = z.shape
         assert pattern.n_q == n_q
-        inp = torch.full((bs, pattern.n_q, pattern.timesteps), special_token, dtype=torch.long).numpy()
+        inp = torch.full(
+            (bs, pattern.n_q, pattern.timesteps), special_token, dtype=torch.long
+        ).numpy()
         inp[:] = special_token
         for s, v in enumerate(pattern.layout):
-            for (t, q) in v:
+            for t, q in v:
                 if t < pattern.timesteps:
                     inp[:, q, t] = z[:, q, s]
         return torch.from_numpy(inp)
 
-    def ref_revert_pattern_logits(self, z: torch.Tensor, pattern: Pattern, special_token: float):
+    def ref_revert_pattern_logits(
+        self, z: torch.Tensor, pattern: Pattern, special_token: float
+    ):
         """Reference method to revert the logits from the pattern without using fancy scatter."""
         z = z.cpu().numpy()
         bs, card, n_q, S = z.shape
         assert pattern.n_q == n_q
         ref_layout = pattern.layout
-        inp = torch.full((bs, card, pattern.n_q, pattern.timesteps), special_token, dtype=torch.float).numpy()
+        inp = torch.full(
+            (bs, card, pattern.n_q, pattern.timesteps), special_token, dtype=torch.float
+        ).numpy()
         inp[:] = special_token
         for s, v in enumerate(ref_layout[1:]):
             if s < S:
-                for (t, q) in v:
+                for t, q in v:
                     if t < pattern.timesteps:
                         inp[:, :, q, t] = z[:, :, q, s]
         return torch.from_numpy(inp)
@@ -228,7 +242,7 @@ class TestPattern:
     def test_revert_pattern_logits(self, n_q: int, timesteps: int, card: int):
         bs = 2
         special_token = card
-        logits_special_token = float('nan')
+        logits_special_token = float("nan")
 
         pattern_providers = self._get_pattern_providers(n_q)
         for pattern_provider in pattern_providers:
@@ -237,10 +251,14 @@ class TestPattern:
             z = torch.randint(0, card, (bs, n_q, timesteps))
             s = self.ref_build_pattern_sequence(z, pattern, special_token)
             logits = torch.randn((bs, card, n_q, s.shape[-1]))
-            ref_out = self.ref_revert_pattern_logits(logits, pattern, logits_special_token)
+            ref_out = self.ref_revert_pattern_logits(
+                logits, pattern, logits_special_token
+            )
             # ensure our reference script retrieve the original sequence
             assert ref_out.shape == torch.Size([bs, card, n_q, timesteps])
             # now we can test the scatter version
-            out, indexes, mask = pattern.revert_pattern_logits(logits, logits_special_token)
+            out, indexes, mask = pattern.revert_pattern_logits(
+                logits, logits_special_token
+            )
             assert out.shape == ref_out.shape
             assert (out == ref_out).float().mean() == 1.0

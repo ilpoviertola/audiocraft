@@ -16,22 +16,41 @@ from audiocraft.quantization import DummyQuantizer
 
 class TestEncodecModel:
 
-    def _create_encodec_model(self,
-                              sample_rate: int,
-                              channels: int,
-                              dim: int = 5,
-                              n_filters: int = 3,
-                              n_residual_layers: int = 1,
-                              ratios: list = [5, 4, 3, 2],
-                              **kwargs):
+    def _create_encodec_model(
+        self,
+        sample_rate: int,
+        channels: int,
+        dim: int = 5,
+        n_filters: int = 3,
+        n_residual_layers: int = 1,
+        ratios: list = [5, 4, 3, 2],
+        **kwargs,
+    ):
         frame_rate = np.prod(ratios)
-        encoder = SEANetEncoder(channels=channels, dimension=dim, n_filters=n_filters,
-                                n_residual_layers=n_residual_layers, ratios=ratios)
-        decoder = SEANetDecoder(channels=channels, dimension=dim, n_filters=n_filters,
-                                n_residual_layers=n_residual_layers, ratios=ratios)
+        encoder = SEANetEncoder(
+            channels=channels,
+            dimension=dim,
+            n_filters=n_filters,
+            n_residual_layers=n_residual_layers,
+            ratios=ratios,
+        )
+        decoder = SEANetDecoder(
+            channels=channels,
+            dimension=dim,
+            n_filters=n_filters,
+            n_residual_layers=n_residual_layers,
+            ratios=ratios,
+        )
         quantizer = DummyQuantizer()
-        model = EncodecModel(encoder, decoder, quantizer, frame_rate=frame_rate,
-                             sample_rate=sample_rate, channels=channels, **kwargs)
+        model = EncodecModel(
+            encoder,
+            decoder,
+            quantizer,
+            frame_rate=frame_rate,
+            sample_rate=sample_rate,
+            channels=channels,
+            **kwargs,
+        )
         return model
 
     def test_model(self):
@@ -49,8 +68,12 @@ class TestEncodecModel:
         random.seed(1234)
         sample_rate = 24_000
         channels = 1
-        model_nonorm = self._create_encodec_model(sample_rate, channels, renormalize=False)
-        model_renorm = self._create_encodec_model(sample_rate, channels, renormalize=True)
+        model_nonorm = self._create_encodec_model(
+            sample_rate, channels, renormalize=False
+        )
+        model_renorm = self._create_encodec_model(
+            sample_rate, channels, renormalize=True
+        )
 
         for _ in range(10):
             length = random.randrange(1, 10_000)

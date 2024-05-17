@@ -23,7 +23,7 @@ from audiocraft.models import MAGNeT
 
 
 MODEL = None  # Last used model
-SPACE_ID = os.environ.get('SPACE_ID', '')
+SPACE_ID = os.environ.get("SPACE_ID", "")
 MAX_BATCH_SIZE = 12
 N_REPEATS = 2
 INTERRUPTING = False
@@ -36,8 +36,8 @@ PROD_STRIDE_1 = "prod-stride1 (new!)"
 
 def _call_nostderr(*args, **kwargs):
     # Avoid ffmpeg vomiting on the logs.
-    kwargs['stderr'] = sp.DEVNULL
-    kwargs['stdout'] = sp.DEVNULL
+    kwargs["stderr"] = sp.DEVNULL
+    kwargs["stdout"] = sp.DEVNULL
     _old_call(*args, **kwargs)
 
 
@@ -79,13 +79,13 @@ def make_waveform(*args, **kwargs):
     # Further remove some warnings.
     be = time.time()
     with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
+        warnings.simplefilter("ignore")
         out = gr.make_waveform(*args, **kwargs)
         print("Make a video took", time.time() - be)
         return out
 
 
-def load_model(version='facebook/magnet-small-10secs'):
+def load_model(version="facebook/magnet-small-10secs"):
     global MODEL
     print("Loading model", version)
     if MODEL is None or MODEL.name != version:
@@ -108,8 +108,14 @@ def _do_predictions(texts, progress=False, gradio_progress=None, **gen_kwargs):
     for i, output in enumerate(outputs):
         with NamedTemporaryFile("wb", suffix=".wav", delete=False) as file:
             audio_write(
-                file.name, output, MODEL.sample_rate, strategy="loudness",
-                loudness_headroom_db=16, loudness_compressor=True, add_suffix=False)
+                file.name,
+                output,
+                MODEL.sample_rate,
+                strategy="loudness",
+                loudness_headroom_db=16,
+                loudness_compressor=True,
+                add_suffix=False,
+            )
             if i == 0:
                 pending_videos.append(pool.submit(make_waveform, file.name))
             out_wavs.append(file.name)
@@ -125,16 +131,26 @@ def _do_predictions(texts, progress=False, gradio_progress=None, **gen_kwargs):
 def predict_batched(texts, melodies):
     max_text_length = 512
     texts = [text[:max_text_length] for text in texts]
-    load_model('facebook/magnet-small-10secs')
+    load_model("facebook/magnet-small-10secs")
     res = _do_predictions(texts, melodies)
     return res
 
 
-def predict_full(model, model_path, text, temperature, topp,
-                 max_cfg_coef, min_cfg_coef, 
-                 decoding_steps1, decoding_steps2, decoding_steps3, decoding_steps4, 
-                 span_score,
-                 progress=gr.Progress()):
+def predict_full(
+    model,
+    model_path,
+    text,
+    temperature,
+    topp,
+    max_cfg_coef,
+    min_cfg_coef,
+    decoding_steps1,
+    decoding_steps2,
+    decoding_steps3,
+    decoding_steps4,
+    span_score,
+    progress=gr.Progress(),
+):
     global INTERRUPTING
     INTERRUPTING = False
     progress(0, desc="Loading model...")
@@ -143,8 +159,10 @@ def predict_full(model, model_path, text, temperature, topp,
         if not Path(model_path).exists():
             raise gr.Error(f"Model path {model_path} doesn't exist.")
         if not Path(model_path).is_dir():
-            raise gr.Error(f"Model path {model_path} must be a folder containing "
-                           "state_dict.bin and compression_state_dict_.bin.")
+            raise gr.Error(
+                f"Model path {model_path} must be a folder containing "
+                "state_dict.bin and compression_state_dict_.bin."
+            )
         model = model_path
     if temperature < 0:
         raise gr.Error("Temperature must be >= 0.")
@@ -159,18 +177,29 @@ def predict_full(model, model_path, text, temperature, topp,
         progress((min(max_generated, to_generate), to_generate))
         if INTERRUPTING:
             raise gr.Error("Interrupted.")
+
     MODEL.set_custom_progress_callback(_progress)
-    
+
     videos, wavs = _do_predictions(
-        [text] * N_REPEATS, progress=True,
-        temperature=temperature, top_p=topp,
-        max_cfg_coef=max_cfg_coef, min_cfg_coef=min_cfg_coef, 
-        decoding_steps=[decoding_steps1, decoding_steps2, decoding_steps3, decoding_steps4],
-        span_arrangement='stride1' if (span_score == PROD_STRIDE_1) else 'nonoverlap',
-        gradio_progress=progress)
+        [text] * N_REPEATS,
+        progress=True,
+        temperature=temperature,
+        top_p=topp,
+        max_cfg_coef=max_cfg_coef,
+        min_cfg_coef=min_cfg_coef,
+        decoding_steps=[
+            decoding_steps1,
+            decoding_steps2,
+            decoding_steps3,
+            decoding_steps4,
+        ],
+        span_arrangement="stride1" if (span_score == PROD_STRIDE_1) else "nonoverlap",
+        gradio_progress=progress,
+    )
 
     outputs_ = [videos[0]] + [wav for wav in wavs]
     return tuple(outputs_)
+
 
 def ui_full(launch_kwargs):
     with gr.Blocks() as interface:
@@ -185,83 +214,174 @@ def ui_full(launch_kwargs):
         with gr.Row():
             with gr.Column():
                 with gr.Row():
-                    text = gr.Text(label="Input Text", value="80s electronic track with melodic synthesizers, catchy beat and groovy bass", interactive=True)
+                    text = gr.Text(
+                        label="Input Text",
+                        value="80s electronic track with melodic synthesizers, catchy beat and groovy bass",
+                        interactive=True,
+                    )
                 with gr.Row():
                     submit = gr.Button("Submit")
                     # Adapted from https://github.com/rkfg/audiocraft/blob/long/app.py, MIT license.
                     _ = gr.Button("Interrupt").click(fn=interrupt, queue=False)
                 with gr.Row():
-                    model = gr.Radio(['facebook/magnet-small-10secs', 'facebook/magnet-medium-10secs',
-                                      'facebook/magnet-small-30secs', 'facebook/magnet-medium-30secs',
-                                      'facebook/audio-magnet-small', 'facebook/audio-magnet-medium'],
-                                     label="Model", value='facebook/magnet-small-10secs', interactive=True)
-                    model_path = gr.Text(label="Model Path (custom models)") 
+                    model = gr.Radio(
+                        [
+                            "facebook/magnet-small-10secs",
+                            "facebook/magnet-medium-10secs",
+                            "facebook/magnet-small-30secs",
+                            "facebook/magnet-medium-30secs",
+                            "facebook/audio-magnet-small",
+                            "facebook/audio-magnet-medium",
+                        ],
+                        label="Model",
+                        value="facebook/magnet-small-10secs",
+                        interactive=True,
+                    )
+                    model_path = gr.Text(label="Model Path (custom models)")
                 with gr.Row():
-                    span_score = gr.Radio(["max-nonoverlap", PROD_STRIDE_1],
-                                       label="Span Scoring", value=PROD_STRIDE_1, interactive=True)       
+                    span_score = gr.Radio(
+                        ["max-nonoverlap", PROD_STRIDE_1],
+                        label="Span Scoring",
+                        value=PROD_STRIDE_1,
+                        interactive=True,
+                    )
                 with gr.Row():
-                    decoding_steps1 = gr.Number(label="Decoding Steps (stage 1)", value=20, interactive=True)
-                    decoding_steps2 = gr.Number(label="Decoding Steps (stage 2)", value=10, interactive=True)
-                    decoding_steps3 = gr.Number(label="Decoding Steps (stage 3)", value=10, interactive=True)
-                    decoding_steps4 = gr.Number(label="Decoding Steps (stage 4)", value=10, interactive=True)
+                    decoding_steps1 = gr.Number(
+                        label="Decoding Steps (stage 1)", value=20, interactive=True
+                    )
+                    decoding_steps2 = gr.Number(
+                        label="Decoding Steps (stage 2)", value=10, interactive=True
+                    )
+                    decoding_steps3 = gr.Number(
+                        label="Decoding Steps (stage 3)", value=10, interactive=True
+                    )
+                    decoding_steps4 = gr.Number(
+                        label="Decoding Steps (stage 4)", value=10, interactive=True
+                    )
                 with gr.Row():
-                    temperature = gr.Number(label="Temperature", value=3.0, step=0.25, minimum=0, interactive=True)
-                    topp = gr.Number(label="Top-p", value=0.9, step=0.1, minimum=0, maximum=1, interactive=True)
-                    max_cfg_coef = gr.Number(label="Max CFG coefficient", value=10.0, minimum=0, interactive=True)
-                    min_cfg_coef = gr.Number(label="Min CFG coefficient", value=1.0, minimum=0, interactive=True)                
+                    temperature = gr.Number(
+                        label="Temperature",
+                        value=3.0,
+                        step=0.25,
+                        minimum=0,
+                        interactive=True,
+                    )
+                    topp = gr.Number(
+                        label="Top-p",
+                        value=0.9,
+                        step=0.1,
+                        minimum=0,
+                        maximum=1,
+                        interactive=True,
+                    )
+                    max_cfg_coef = gr.Number(
+                        label="Max CFG coefficient",
+                        value=10.0,
+                        minimum=0,
+                        interactive=True,
+                    )
+                    min_cfg_coef = gr.Number(
+                        label="Min CFG coefficient",
+                        value=1.0,
+                        minimum=0,
+                        interactive=True,
+                    )
             with gr.Column():
                 output = gr.Video(label="Generated Audio - variation 1")
-                audio_outputs = [gr.Audio(label=f"Generated Audio - variation {i+1}", type='filepath') for i in range(N_REPEATS)]
-        submit.click(fn=predict_full, 
-                        inputs=[model, model_path, text, 
-                                    temperature, topp,
-                                    max_cfg_coef, min_cfg_coef,
-                                    decoding_steps1, decoding_steps2, decoding_steps3, decoding_steps4,
-                                    span_score],
-                                    outputs=[output] + [o for o in audio_outputs])
+                audio_outputs = [
+                    gr.Audio(
+                        label=f"Generated Audio - variation {i+1}", type="filepath"
+                    )
+                    for i in range(N_REPEATS)
+                ]
+        submit.click(
+            fn=predict_full,
+            inputs=[
+                model,
+                model_path,
+                text,
+                temperature,
+                topp,
+                max_cfg_coef,
+                min_cfg_coef,
+                decoding_steps1,
+                decoding_steps2,
+                decoding_steps3,
+                decoding_steps4,
+                span_score,
+            ],
+            outputs=[output] + [o for o in audio_outputs],
+        )
         gr.Examples(
             fn=predict_full,
             examples=[
                 [
                     "80s electronic track with melodic synthesizers, catchy beat and groovy bass",
-                    'facebook/magnet-small-10secs',
-                    20, 3.0, 0.9, 10.0,
+                    "facebook/magnet-small-10secs",
+                    20,
+                    3.0,
+                    0.9,
+                    10.0,
                 ],
                 [
                     "80s electronic track with melodic synthesizers, catchy beat and groovy bass. 170 bpm",
-                    'facebook/magnet-small-10secs',
-                    20, 3.0, 0.9, 10.0,
+                    "facebook/magnet-small-10secs",
+                    20,
+                    3.0,
+                    0.9,
+                    10.0,
                 ],
                 [
                     "Earthy tones, environmentally conscious, ukulele-infused, harmonic, breezy, easygoing, organic instrumentation, gentle grooves",
-                    'facebook/magnet-medium-10secs',
-                    20, 3.0, 0.9, 10.0,
+                    "facebook/magnet-medium-10secs",
+                    20,
+                    3.0,
+                    0.9,
+                    10.0,
                 ],
-                [   "Funky groove with electric piano playing blue chords rhythmically",
-                    'facebook/magnet-medium-10secs',
-                    20, 3.0, 0.9, 10.0,
+                [
+                    "Funky groove with electric piano playing blue chords rhythmically",
+                    "facebook/magnet-medium-10secs",
+                    20,
+                    3.0,
+                    0.9,
+                    10.0,
                 ],
                 [
                     "Rock with saturated guitars, a heavy bass line and crazy drum break and fills.",
-                    'facebook/magnet-small-30secs',
-                    60, 3.0, 0.9, 10.0,
+                    "facebook/magnet-small-30secs",
+                    60,
+                    3.0,
+                    0.9,
+                    10.0,
                 ],
-                [   "A grand orchestral arrangement with thunderous percussion, epic brass fanfares, and soaring strings, creating a cinematic atmosphere fit for a heroic battle",
-                    'facebook/magnet-medium-30secs',
-                    60, 3.0, 0.9, 10.0,
+                [
+                    "A grand orchestral arrangement with thunderous percussion, epic brass fanfares, and soaring strings, creating a cinematic atmosphere fit for a heroic battle",
+                    "facebook/magnet-medium-30secs",
+                    60,
+                    3.0,
+                    0.9,
+                    10.0,
                 ],
-                [   "Seagulls squawking as ocean waves crash while wind blows heavily into a microphone.",
-                    'facebook/audio-magnet-small', 
-                    20, 3.5, 0.8, 20.0,
+                [
+                    "Seagulls squawking as ocean waves crash while wind blows heavily into a microphone.",
+                    "facebook/audio-magnet-small",
+                    20,
+                    3.5,
+                    0.8,
+                    20.0,
                 ],
-                [   "A toilet flushing as music is playing and a man is singing in the distance.",
-                    'facebook/audio-magnet-medium', 
-                    20, 3.5, 0.8, 20.0,
+                [
+                    "A toilet flushing as music is playing and a man is singing in the distance.",
+                    "facebook/audio-magnet-medium",
+                    20,
+                    3.5,
+                    0.8,
+                    20.0,
                 ],
             ],
-
             inputs=[text, model, decoding_steps1, temperature, topp, max_cfg_coef],
-            outputs=[output]
+            outputs=[output],
         )
 
         gr.Markdown(
@@ -307,43 +427,39 @@ def ui_full(launch_kwargs):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--listen',
+        "--listen",
         type=str,
-        default='0.0.0.0' if 'SPACE_ID' in os.environ else '127.0.0.1',
-        help='IP to listen on for connections to Gradio',
+        default="0.0.0.0" if "SPACE_ID" in os.environ else "127.0.0.1",
+        help="IP to listen on for connections to Gradio",
     )
     parser.add_argument(
-        '--username', type=str, default='', help='Username for authentication'
+        "--username", type=str, default="", help="Username for authentication"
     )
     parser.add_argument(
-        '--password', type=str, default='', help='Password for authentication'
+        "--password", type=str, default="", help="Password for authentication"
     )
     parser.add_argument(
-        '--server_port',
+        "--server_port",
         type=int,
         default=0,
-        help='Port to run the server listener on',
+        help="Port to run the server listener on",
     )
-    parser.add_argument(
-        '--inbrowser', action='store_true', help='Open in browser'
-    )
-    parser.add_argument(
-        '--share', action='store_true', help='Share the gradio UI'
-    )
+    parser.add_argument("--inbrowser", action="store_true", help="Open in browser")
+    parser.add_argument("--share", action="store_true", help="Share the gradio UI")
 
     args = parser.parse_args()
 
     launch_kwargs = {}
-    launch_kwargs['server_name'] = args.listen
+    launch_kwargs["server_name"] = args.listen
 
     if args.username and args.password:
-        launch_kwargs['auth'] = (args.username, args.password)
+        launch_kwargs["auth"] = (args.username, args.password)
     if args.server_port:
-        launch_kwargs['server_port'] = args.server_port
+        launch_kwargs["server_port"] = args.server_port
     if args.inbrowser:
-        launch_kwargs['inbrowser'] = args.inbrowser
+        launch_kwargs["inbrowser"] = args.inbrowser
     if args.share:
-        launch_kwargs['share'] = args.share
+        launch_kwargs["share"] = args.share
 
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 

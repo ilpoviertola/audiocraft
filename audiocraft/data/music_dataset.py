@@ -20,7 +20,7 @@ from .info_audio_dataset import (
     AudioInfo,
     get_keyword_list,
     get_keyword,
-    get_string
+    get_string,
 )
 from ..modules.conditioners import (
     ConditioningAttributes,
@@ -35,11 +35,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MusicInfo(AudioInfo):
-    """Segment info augmented with music metadata.
-    """
+    """Segment info augmented with music metadata."""
+
     # music-specific metadata
     title: tp.Optional[str] = None
-    artist: tp.Optional[str] = None  # anonymized artist id, used to ensure no overlap between splits
+    artist: tp.Optional[str] = (
+        None  # anonymized artist id, used to ensure no overlap between splits
+    )
     key: tp.Optional[str] = None
     bpm: tp.Optional[float] = None
     genre: tp.Optional[str] = None
@@ -61,28 +63,28 @@ class MusicInfo(AudioInfo):
         out = ConditioningAttributes()
         for _field in fields(self):
             key, value = _field.name, getattr(self, _field.name)
-            if key == 'self_wav':
+            if key == "self_wav":
                 out.wav[key] = value
-            elif key == 'joint_embed':
+            elif key == "joint_embed":
                 for embed_attribute, embed_cond in value.items():
                     out.joint_embed[embed_attribute] = embed_cond
             else:
                 if isinstance(value, list):
-                    value = ' '.join(value)
+                    value = " ".join(value)
                 out.text[key] = value
         return out
 
     @staticmethod
     def attribute_getter(attribute):
-        if attribute == 'bpm':
+        if attribute == "bpm":
             preprocess_func = get_bpm
-        elif attribute == 'key':
+        elif attribute == "key":
             preprocess_func = get_musical_key
-        elif attribute in ['moods', 'keywords']:
+        elif attribute in ["moods", "keywords"]:
             preprocess_func = get_keyword_list
-        elif attribute in ['genre', 'name', 'instrument']:
+        elif attribute in ["genre", "name", "instrument"]:
             preprocess_func = get_keyword
-        elif attribute in ['title', 'artist', 'description']:
+        elif attribute in ["title", "artist", "description"]:
             preprocess_func = get_string
         else:
             preprocess_func = None
@@ -94,8 +96,8 @@ class MusicInfo(AudioInfo):
 
         # allow a subset of attributes to not be loaded from the dictionary
         # these attributes may be populated later
-        post_init_attributes = ['self_wav', 'joint_embed']
-        optional_fields = ['keywords']
+        post_init_attributes = ["self_wav", "joint_embed"]
+        optional_fields = ["keywords"]
 
         for _field in fields(cls):
             if _field.name in post_init_attributes:
@@ -104,7 +106,9 @@ class MusicInfo(AudioInfo):
                 if fields_required and _field.name not in optional_fields:
                     raise KeyError(f"Unexpected missing key: {_field.name}")
             else:
-                preprocess_func: tp.Optional[tp.Callable] = cls.attribute_getter(_field.name)
+                preprocess_func: tp.Optional[tp.Callable] = cls.attribute_getter(
+                    _field.name
+                )
                 value = dictionary[_field.name]
                 if preprocess_func:
                     value = preprocess_func(value)
@@ -112,8 +116,12 @@ class MusicInfo(AudioInfo):
         return cls(**_dictionary)
 
 
-def augment_music_info_description(music_info: MusicInfo, merge_text_p: float = 0.,
-                                   drop_desc_p: float = 0., drop_other_p: float = 0.) -> MusicInfo:
+def augment_music_info_description(
+    music_info: MusicInfo,
+    merge_text_p: float = 0.0,
+    drop_desc_p: float = 0.0,
+    drop_other_p: float = 0.0,
+) -> MusicInfo:
     """Augment MusicInfo description with additional metadata fields and potential dropout.
     Additional textual attributes are added given probability 'merge_text_conditions_p' and
     the original textual description is dropped from the augmented description given probability drop_desc_p.
@@ -128,9 +136,19 @@ def augment_music_info_description(music_info: MusicInfo, merge_text_p: float = 
     Returns:
         MusicInfo: The MusicInfo with augmented textual description.
     """
+
     def is_valid_field(field_name: str, field_value: tp.Any) -> bool:
-        valid_field_name = field_name in ['key', 'bpm', 'genre', 'moods', 'instrument', 'keywords']
-        valid_field_value = field_value is not None and isinstance(field_value, (int, float, str, list))
+        valid_field_name = field_name in [
+            "key",
+            "bpm",
+            "genre",
+            "moods",
+            "instrument",
+            "keywords",
+        ]
+        valid_field_value = field_value is not None and isinstance(
+            field_value, (int, float, str, list)
+        )
         keep_field = random.uniform(0, 1) < drop_other_p
         return valid_field_name and valid_field_value and keep_field
 
@@ -146,17 +164,22 @@ def augment_music_info_description(music_info: MusicInfo, merge_text_p: float = 
 
     metadata_text = ""
     if random.uniform(0, 1) < merge_text_p:
-        meta_pairs = [f'{_field.name}: {process_value(getattr(music_info, _field.name))}'
-                      for _field in fields(music_info) if is_valid_field(_field.name, getattr(music_info, _field.name))]
+        meta_pairs = [
+            f"{_field.name}: {process_value(getattr(music_info, _field.name))}"
+            for _field in fields(music_info)
+            if is_valid_field(_field.name, getattr(music_info, _field.name))
+        ]
         random.shuffle(meta_pairs)
         metadata_text = ". ".join(meta_pairs)
         description = description if not random.uniform(0, 1) < drop_desc_p else None
-        logger.debug(f"Applying text augmentation on MMI info. description: {description}, metadata: {metadata_text}")
+        logger.debug(
+            f"Applying text augmentation on MMI info. description: {description}, metadata: {metadata_text}"
+        )
 
     if description is None:
         description = metadata_text if len(metadata_text) > 1 else None
     else:
-        description = ". ".join([description.rstrip('.'), metadata_text])
+        description = ". ".join([description.rstrip("."), metadata_text])
     description = description.strip() if description else None
 
     music_info = replace(music_info)
@@ -165,17 +188,19 @@ def augment_music_info_description(music_info: MusicInfo, merge_text_p: float = 
 
 
 class Paraphraser:
-    def __init__(self, paraphrase_source: tp.Union[str, Path], paraphrase_p: float = 0.):
+    def __init__(
+        self, paraphrase_source: tp.Union[str, Path], paraphrase_p: float = 0.0
+    ):
         self.paraphrase_p = paraphrase_p
-        open_fn = gzip.open if str(paraphrase_source).lower().endswith('.gz') else open
-        with open_fn(paraphrase_source, 'rb') as f:  # type: ignore
+        open_fn = gzip.open if str(paraphrase_source).lower().endswith(".gz") else open
+        with open_fn(paraphrase_source, "rb") as f:  # type: ignore
             self.paraphrase_source = json.loads(f.read())
         logger.info(f"loaded paraphrasing source from: {paraphrase_source}")
 
     def sample_paraphrase(self, audio_path: str, description: str):
         if random.random() >= self.paraphrase_p:
             return description
-        info_path = Path(audio_path).with_suffix('.json')
+        info_path = Path(audio_path).with_suffix(".json")
         if info_path not in self.paraphrase_source:
             warn_once(logger, f"{info_path} not in paraphrase source!")
             return description
@@ -201,12 +226,22 @@ class MusicDataset(InfoAudioDataset):
 
     See `audiocraft.data.info_audio_dataset.InfoAudioDataset` for full initialization arguments.
     """
-    def __init__(self, *args, info_fields_required: bool = True,
-                 merge_text_p: float = 0., drop_desc_p: float = 0., drop_other_p: float = 0.,
-                 joint_embed_attributes: tp.List[str] = [],
-                 paraphrase_source: tp.Optional[str] = None, paraphrase_p: float = 0,
-                 **kwargs):
-        kwargs['return_info'] = True  # We require the info for each song of the dataset.
+
+    def __init__(
+        self,
+        *args,
+        info_fields_required: bool = True,
+        merge_text_p: float = 0.0,
+        drop_desc_p: float = 0.0,
+        drop_other_p: float = 0.0,
+        joint_embed_attributes: tp.List[str] = [],
+        paraphrase_source: tp.Optional[str] = None,
+        paraphrase_p: float = 0,
+        **kwargs,
+    ):
+        kwargs["return_info"] = (
+            True  # We require the info for each song of the dataset.
+        )
         super().__init__(*args, **kwargs)
         self.info_fields_required = info_fields_required
         self.merge_text_p = merge_text_p
@@ -220,30 +255,44 @@ class MusicDataset(InfoAudioDataset):
     def __getitem__(self, index):
         wav, info = super().__getitem__(index)
         info_data = info.to_dict()
-        music_info_path = Path(info.meta.path).with_suffix('.json')
+        music_info_path = Path(info.meta.path).with_suffix(".json")
 
         if Path(music_info_path).exists():
-            with open(music_info_path, 'r') as json_file:
+            with open(music_info_path, "r") as json_file:
                 music_data = json.load(json_file)
                 music_data.update(info_data)
-                music_info = MusicInfo.from_dict(music_data, fields_required=self.info_fields_required)
+                music_info = MusicInfo.from_dict(
+                    music_data, fields_required=self.info_fields_required
+                )
             if self.paraphraser is not None:
-                music_info.description = self.paraphraser.sample(music_info.meta.path, music_info.description)
+                music_info.description = self.paraphraser.sample(
+                    music_info.meta.path, music_info.description
+                )
             if self.merge_text_p:
                 music_info = augment_music_info_description(
-                    music_info, self.merge_text_p, self.drop_desc_p, self.drop_other_p)
+                    music_info, self.merge_text_p, self.drop_desc_p, self.drop_other_p
+                )
         else:
             music_info = MusicInfo.from_dict(info_data, fields_required=False)
 
         music_info.self_wav = WavCondition(
-            wav=wav[None], length=torch.tensor([info.n_frames]),
-            sample_rate=[info.sample_rate], path=[info.meta.path], seek_time=[info.seek_time])
+            wav=wav[None],
+            length=torch.tensor([info.n_frames]),
+            sample_rate=[info.sample_rate],
+            path=[info.meta.path],
+            seek_time=[info.seek_time],
+        )
 
         for att in self.joint_embed_attributes:
             att_value = getattr(music_info, att)
             joint_embed_cond = JointEmbedCondition(
-                wav[None], [att_value], torch.tensor([info.n_frames]),
-                sample_rate=[info.sample_rate], path=[info.meta.path], seek_time=[info.seek_time])
+                wav[None],
+                [att_value],
+                torch.tensor([info.n_frames]),
+                sample_rate=[info.sample_rate],
+                path=[info.meta.path],
+                seek_time=[info.seek_time],
+            )
             music_info.joint_embed[att] = joint_embed_cond
 
         return wav, music_info
@@ -251,9 +300,14 @@ class MusicDataset(InfoAudioDataset):
 
 def get_musical_key(value: tp.Optional[str]) -> tp.Optional[str]:
     """Preprocess key keywords, discarding them if there are multiple key defined."""
-    if value is None or (not isinstance(value, str)) or len(value) == 0 or value == 'None':
+    if (
+        value is None
+        or (not isinstance(value, str))
+        or len(value) == 0
+        or value == "None"
+    ):
         return None
-    elif ',' in value:
+    elif "," in value:
         # For now, we discard when multiple keys are defined separated with comas
         return None
     else:

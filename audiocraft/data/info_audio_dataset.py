@@ -26,7 +26,9 @@ def _clusterify_meta(meta: AudioMeta) -> AudioMeta:
     """Monkey-patch meta to match cluster specificities."""
     meta.path = AudioCraftEnvironment.apply_dataset_mappers(meta.path)
     if meta.info_path is not None:
-        meta.info_path.zip_path = AudioCraftEnvironment.apply_dataset_mappers(meta.info_path.zip_path)
+        meta.info_path.zip_path = AudioCraftEnvironment.apply_dataset_mappers(
+            meta.info_path.zip_path
+        )
     return meta
 
 
@@ -45,7 +47,10 @@ class AudioInfo(SegmentWithAttributes):
     This basically guarantees all datasets will be compatible with current
     solver that contain conditioners requiring this.
     """
-    audio_tokens: tp.Optional[torch.Tensor] = None  # populated when using cached batch for training a LM.
+
+    audio_tokens: tp.Optional[torch.Tensor] = (
+        None  # populated when using cached batch for training a LM.
+    )
 
     def to_condition_attributes(self) -> ConditioningAttributes:
         return ConditioningAttributes()
@@ -56,10 +61,13 @@ class InfoAudioDataset(AudioDataset):
 
     See `audiocraft.data.audio_dataset.AudioDataset` for initialization arguments.
     """
+
     def __init__(self, meta: tp.List[AudioMeta], **kwargs):
         super().__init__(clusterify_all_meta(meta), **kwargs)
 
-    def __getitem__(self, index: int) -> tp.Union[torch.Tensor, tp.Tuple[torch.Tensor, SegmentWithAttributes]]:
+    def __getitem__(
+        self, index: int
+    ) -> tp.Union[torch.Tensor, tp.Tuple[torch.Tensor, SegmentWithAttributes]]:
         if not self.return_info:
             wav = super().__getitem__(index)
             assert isinstance(wav, torch.Tensor)
@@ -68,7 +76,9 @@ class InfoAudioDataset(AudioDataset):
         return wav, AudioInfo(**meta.to_dict())
 
 
-def get_keyword_or_keyword_list(value: tp.Optional[str]) -> tp.Union[tp.Optional[str], tp.Optional[tp.List[str]]]:
+def get_keyword_or_keyword_list(
+    value: tp.Optional[str],
+) -> tp.Union[tp.Optional[str], tp.Optional[tp.List[str]]]:
     """Preprocess a single keyword or possible a list of keywords."""
     if isinstance(value, list):
         return get_keyword_list(value)
@@ -78,7 +88,12 @@ def get_keyword_or_keyword_list(value: tp.Optional[str]) -> tp.Union[tp.Optional
 
 def get_string(value: tp.Optional[str]) -> tp.Optional[str]:
     """Preprocess a single keyword."""
-    if value is None or (not isinstance(value, str)) or len(value) == 0 or value == 'None':
+    if (
+        value is None
+        or (not isinstance(value, str))
+        or len(value) == 0
+        or value == "None"
+    ):
         return None
     else:
         return value.strip()
@@ -86,7 +101,12 @@ def get_string(value: tp.Optional[str]) -> tp.Optional[str]:
 
 def get_keyword(value: tp.Optional[str]) -> tp.Optional[str]:
     """Preprocess a single keyword."""
-    if value is None or (not isinstance(value, str)) or len(value) == 0 or value == 'None':
+    if (
+        value is None
+        or (not isinstance(value, str))
+        or len(value) == 0
+        or value == "None"
+    ):
         return None
     else:
         return value.strip().lower()
@@ -95,7 +115,7 @@ def get_keyword(value: tp.Optional[str]) -> tp.Optional[str]:
 def get_keyword_list(values: tp.Union[str, tp.List[str]]) -> tp.Optional[tp.List[str]]:
     """Preprocess a list of keywords."""
     if isinstance(values, str):
-        values = [v.strip() for v in re.split(r'[,\s]', values)]
+        values = [v.strip() for v in re.split(r"[,\s]", values)]
     elif isinstance(values, float) and math.isnan(values):
         values = []
     if not isinstance(values, list):

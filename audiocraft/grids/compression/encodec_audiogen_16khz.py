@@ -18,12 +18,12 @@ from ...environment import AudioCraftEnvironment
 
 @CompressionExplorer
 def explorer(launcher):
-    partitions = AudioCraftEnvironment.get_slurm_partitions(['team', 'global'])
+    partitions = AudioCraftEnvironment.get_slurm_partitions(["team", "global"])
     launcher.slurm_(gpus=8, partition=partitions)
     # use configuration for AudioGen's EnCodec model trained on monophonic audio sampled at 16 kHz
     # AudioGen's EnCodec is trained with a total stride of 320 leading to a frame rate of 50 hz
-    launcher.bind_(solver='compression/encodec_audiogen_16khz')
+    launcher.bind_(solver="compression/encodec_audiogen_16khz")
     # replace this by the desired sound dataset
-    launcher.bind_(dset='internal/sounds_16khz')
+    launcher.bind_(dset="internal/sounds_16khz")
     # launch xp
     launcher()

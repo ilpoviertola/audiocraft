@@ -18,13 +18,13 @@ def get_sheep_ping(sheep) -> tp.Optional[str]:
     if sheep.log is not None and sheep.log.exists():
         delta = time.time() - sheep.log.stat().st_mtime
         if delta > 3600 * 24:
-            ping = f'{delta / (3600 * 24):.1f}d'
+            ping = f"{delta / (3600 * 24):.1f}d"
         elif delta > 3600:
-            ping = f'{delta / (3600):.1f}h'
+            ping = f"{delta / (3600):.1f}h"
         elif delta > 60:
-            ping = f'{delta / 60:.1f}m'
+            ping = f"{delta / 60:.1f}m"
         else:
-            ping = f'{delta:.1f}s'
+            ping = f"{delta:.1f}s"
     return ping
 
 
@@ -37,12 +37,12 @@ class BaseExplorer(ABC, Explorer):
     If additional stages are used, the child explorer must define how to handle
     these new stages in the `process_history` and `process_sheep` methods.
     """
+
     def stages(self):
         return ["train", "valid", "evaluate"]
 
     def get_grid_meta(self):
-        """Returns the list of Meta information to display for each XP/job.
-        """
+        """Returns the list of Meta information to display for each XP/job."""
         return [
             tt.leaf("index", align=">"),
             tt.leaf("name", wrap=140),
@@ -53,8 +53,7 @@ class BaseExplorer(ABC, Explorer):
 
     @abstractmethod
     def get_grid_metrics(self):
-        """Return the metrics that should be displayed in the tracking table.
-        """
+        """Return the metrics that should be displayed in the tracking table."""
         ...
 
     def process_sheep(self, sheep, history):
@@ -65,9 +64,9 @@ class BaseExplorer(ABC, Explorer):
         for metrics in history:
             for key, sub in metrics.items():
                 part = parts.get(key, {})
-                if 'duration' in sub:
+                if "duration" in sub:
                     # Convert to minutes for readability.
-                    sub['duration'] = sub['duration'] / 60.
+                    sub["duration"] = sub["duration"] / 60.0
                 part.update(sub)
                 parts[key] = part
         ping = get_sheep_ping(sheep)
@@ -76,5 +75,5 @@ class BaseExplorer(ABC, Explorer):
                 if name not in parts:
                     parts[name] = {}
                 # Add the ping to each part for convenience.
-                parts[name]['ping'] = ping
+                parts[name]["ping"] = ping
         return parts

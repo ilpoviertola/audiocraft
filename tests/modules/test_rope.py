@@ -7,11 +7,14 @@
 import torch
 
 from audiocraft.modules.rope import RotaryEmbedding
-from audiocraft.modules.transformer import StreamingTransformer, set_efficient_attention_backend
+from audiocraft.modules.transformer import (
+    StreamingTransformer,
+    set_efficient_attention_backend,
+)
 
 
 def test_rope():
-    set_efficient_attention_backend('torch')
+    set_efficient_attention_backend("torch")
     B, T, H, C = 8, 75, 16, 128
 
     rope = RotaryEmbedding(dim=C)
@@ -24,7 +27,7 @@ def test_rope():
 
 
 def test_rope_io_dtypes():
-    set_efficient_attention_backend('torch')
+    set_efficient_attention_backend("torch")
     B, T, H, C = 8, 75, 16, 128
 
     rope_32 = RotaryEmbedding(dim=C, dtype=torch.float32)
@@ -48,12 +51,18 @@ def test_rope_io_dtypes():
 
 
 def test_transformer_with_rope():
-    set_efficient_attention_backend('torch')
+    set_efficient_attention_backend("torch")
     torch.manual_seed(1234)
-    for pos in ['rope', 'sin_rope']:
+    for pos in ["rope", "sin_rope"]:
         tr = StreamingTransformer(
-            16, 4, 2, custom=True, dropout=0., layer_scale=0.1,
-            positional_embedding=pos)
+            16,
+            4,
+            2,
+            custom=True,
+            dropout=0.0,
+            layer_scale=0.1,
+            positional_embedding=pos,
+        )
         tr.eval()
         steps = 12
         x = torch.randn(3, steps, 16)
@@ -64,11 +73,11 @@ def test_transformer_with_rope():
 
 @torch.no_grad()
 def test_rope_streaming():
-    set_efficient_attention_backend('torch')
+    set_efficient_attention_backend("torch")
     torch.manual_seed(1234)
     tr = StreamingTransformer(
-        16, 4, 2, causal=True, dropout=0.,
-        custom=True, positional_embedding='rope')
+        16, 4, 2, causal=True, dropout=0.0, custom=True, positional_embedding="rope"
+    )
     tr.eval()
     steps = 12
     x = torch.randn(3, steps, 16)
@@ -92,14 +101,20 @@ def test_rope_streaming():
 
 @torch.no_grad()
 def test_rope_streaming_past_context():
-    set_efficient_attention_backend('torch')
+    set_efficient_attention_backend("torch")
     torch.manual_seed(1234)
 
     for context in [None, 10]:
         tr = StreamingTransformer(
-            16, 4, 1 if context else 2,
-            causal=True, past_context=context, custom=True,
-            dropout=0., positional_embedding='rope')
+            16,
+            4,
+            1 if context else 2,
+            causal=True,
+            past_context=context,
+            custom=True,
+            dropout=0.0,
+            positional_embedding="rope",
+        )
         tr.eval()
 
         steps = 20
@@ -122,14 +137,20 @@ def test_rope_streaming_past_context():
 
 
 def test_rope_memory_efficient():
-    set_efficient_attention_backend('torch')
+    set_efficient_attention_backend("torch")
     torch.manual_seed(1234)
     tr = StreamingTransformer(
-        16, 4, 2, custom=True, dropout=0., layer_scale=0.1,
-        positional_embedding='rope')
+        16, 4, 2, custom=True, dropout=0.0, layer_scale=0.1, positional_embedding="rope"
+    )
     tr_mem_efficient = StreamingTransformer(
-        16, 4, 2, dropout=0., memory_efficient=True, layer_scale=0.1,
-        positional_embedding='rope')
+        16,
+        4,
+        2,
+        dropout=0.0,
+        memory_efficient=True,
+        layer_scale=0.1,
+        positional_embedding="rope",
+    )
     tr_mem_efficient.load_state_dict(tr.state_dict())
     tr.eval()
     steps = 12
@@ -143,7 +164,7 @@ def test_rope_memory_efficient():
 
 
 def test_rope_with_xpos():
-    set_efficient_attention_backend('torch')
+    set_efficient_attention_backend("torch")
     B, T, H, C = 8, 75, 16, 128
 
     rope = RotaryEmbedding(dim=C, xpos=True)
@@ -156,7 +177,7 @@ def test_rope_with_xpos():
 
 
 def test_positional_scale():
-    set_efficient_attention_backend('torch')
+    set_efficient_attention_backend("torch")
     B, T, H, C = 8, 75, 16, 128
 
     rope = RotaryEmbedding(dim=C, xpos=True, scale=0.0)

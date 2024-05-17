@@ -20,12 +20,12 @@ from ...environment import AudioCraftEnvironment
 
 @CompressionExplorer
 def explorer(launcher):
-    partitions = AudioCraftEnvironment.get_slurm_partitions(['team', 'global'])
+    partitions = AudioCraftEnvironment.get_slurm_partitions(["team", "global"])
     launcher.slurm_(gpus=2, partition=partitions)
-    launcher.bind_(solver='compression/debug')
+    launcher.bind_(solver="compression/debug")
 
     with launcher.job_array():
         # base debug task using config from solver=compression/debug
         launcher()
         # we can override parameters in the grid to launch additional xps
-        launcher({'rvq.bins': 2048, 'rvq.n_q': 4})
+        launcher({"rvq.bins": 2048, "rvq.n_q": 4})

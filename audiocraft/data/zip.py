@@ -15,7 +15,7 @@ from typing_extensions import Literal
 
 
 DEFAULT_SIZE = 32
-MODE = Literal['r', 'w', 'x', 'a']
+MODE = Literal["r", "w", "x", "a"]
 
 
 @dataclass(order=True)
@@ -29,7 +29,7 @@ class PathInZip:
             Then we expect path = "/some/location/foo.zip:/data/file1.json".
     """
 
-    INFO_PATH_SEP = ':'
+    INFO_PATH_SEP = ":"
     zip_path: str
     file_path: str
 
@@ -46,7 +46,7 @@ class PathInZip:
         return self.zip_path + self.INFO_PATH_SEP + self.file_path
 
 
-def _open_zip(path: str, mode: MODE = 'r'):
+def _open_zip(path: str, mode: MODE = "r"):
     return zipfile.ZipFile(path, mode)
 
 
@@ -63,7 +63,7 @@ def set_zip_cache_size(max_size: int):
     _cached_open_zip = lru_cache(max_size)(_open_zip)
 
 
-def open_file_in_zip(path_in_zip: PathInZip, mode: str = 'r') -> typing.IO:
+def open_file_in_zip(path_in_zip: PathInZip, mode: str = "r") -> typing.IO:
     """Opens a file stored inside a zip and returns a file-like object.
 
     Args:

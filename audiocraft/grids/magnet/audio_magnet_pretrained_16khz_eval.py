@@ -25,15 +25,15 @@ from ... import train
 
 def eval(launcher, batch_size: int = 32):
     opts = {
-        'dset': 'audio/audiocaps_16khz',
-        'solver/audiogen/evaluation': 'objective_eval',
-        'execute_only': 'evaluate',
-        '+dataset.evaluate.batch_size': batch_size,
-        '+metrics.fad.tf.batch_size': 32,
+        "dset": "audio/audiocaps_16khz",
+        "solver/audiogen/evaluation": "objective_eval",
+        "execute_only": "evaluate",
+        "+dataset.evaluate.batch_size": batch_size,
+        "+metrics.fad.tf.batch_size": 32,
     }
     # binary for FAD computation: replace this path with your own path
     metrics_opts = {
-        'metrics.fad.tf.bin': '/data/home/jadecopet/local/usr/opt/google-research'
+        "metrics.fad.tf.bin": "/data/home/jadecopet/local/usr/opt/google-research"
     }
 
     sub = launcher.bind(opts)
@@ -45,11 +45,11 @@ def eval(launcher, batch_size: int = 32):
 
 @GenerationEvalExplorer
 def explorer(launcher):
-    partitions = AudioCraftEnvironment.get_slurm_partitions(['team', 'global'])
+    partitions = AudioCraftEnvironment.get_slurm_partitions(["team", "global"])
     launcher.slurm_(gpus=4, partition=partitions)
 
-    if 'REGEN' not in os.environ:
-        folder = train.main.dora.dir / 'grids' / __name__.split('.', 2)[-1]
+    if "REGEN" not in os.environ:
+        folder = train.main.dora.dir / "grids" / __name__.split(".", 2)[-1]
         with launcher.job_array():
             for sig in folder.iterdir():
                 if not sig.is_symlink():
@@ -61,14 +61,18 @@ def explorer(launcher):
     with launcher.job_array():
         audio_magnet = launcher.bind(solver="magnet/audio_magnet_16khz")
 
-        fsdp = {'autocast': False, 'fsdp.use': True}
+        fsdp = {"autocast": False, "fsdp.use": True}
 
         # Small audio-MAGNeT model (300M)
-        audio_magnet_small = audio_magnet.bind({'continue_from': '//pretrained/facebook/audio-magnet-small'})
+        audio_magnet_small = audio_magnet.bind(
+            {"continue_from": "//pretrained/facebook/audio-magnet-small"}
+        )
         eval(audio_magnet_small, batch_size=128)
 
         # Medium audio-MAGNeT model (1.5B)
-        audio_magnet_medium = audio_magnet.bind({'continue_from': '//pretrained/facebook/audio-magnet-medium'})
-        audio_magnet_medium.bind_({'model/lm/model_scale': 'medium'})
+        audio_magnet_medium = audio_magnet.bind(
+            {"continue_from": "//pretrained/facebook/audio-magnet-medium"}
+        )
+        audio_magnet_medium.bind_({"model/lm/model_scale": "medium"})
         audio_magnet_medium.bind_(fsdp)
         eval(audio_magnet_medium, batch_size=128)

@@ -12,7 +12,7 @@ from audiocraft.data.audio_utils import (
     _clip_wav,
     convert_audio_channels,
     convert_audio,
-    normalize_audio
+    normalize_audio,
 )
 from ..common_utils import get_batch_white_noise
 
@@ -47,21 +47,21 @@ class TestConvertAudioChannels:
 class TestConvertAudio:
 
     def test_convert_audio_channels_downmix(self):
-        b, c, dur = 2, 3, 4.
+        b, c, dur = 2, 3, 4.0
         sr = 128
         audio = get_batch_white_noise(b, c, int(sr * dur))
         out = convert_audio(audio, from_rate=sr, to_rate=sr, to_channels=2)
         assert list(out.shape) == [audio.shape[0], 2, audio.shape[-1]]
 
     def test_convert_audio_channels_upmix(self):
-        b, c, dur = 2, 1, 4.
+        b, c, dur = 2, 1, 4.0
         sr = 128
         audio = get_batch_white_noise(b, c, int(sr * dur))
         out = convert_audio(audio, from_rate=sr, to_rate=sr, to_channels=3)
         assert list(out.shape) == [audio.shape[0], 3, audio.shape[-1]]
 
     def test_convert_audio_upsample(self):
-        b, c, dur = 2, 1, 4.
+        b, c, dur = 2, 1, 4.0
         sr = 2
         new_sr = 3
         audio = get_batch_white_noise(b, c, int(sr * dur))
@@ -70,7 +70,7 @@ class TestConvertAudio:
         assert torch.allclose(out, out_j)
 
     def test_convert_audio_resample(self):
-        b, c, dur = 2, 1, 4.
+        b, c, dur = 2, 1, 4.0
         sr = 3
         new_sr = 2
         audio = get_batch_white_noise(b, c, int(sr * dur))
@@ -82,29 +82,29 @@ class TestConvertAudio:
 class TestNormalizeAudio:
 
     def test_clip_wav(self):
-        b, c, dur = 2, 1, 4.
+        b, c, dur = 2, 1, 4.0
         sr = 3
         audio = 10.0 * get_batch_white_noise(b, c, int(sr * dur))
         _clip_wav(audio)
         assert audio.abs().max() <= 1
 
     def test_normalize_audio_clip(self):
-        b, c, dur = 2, 1, 4.
+        b, c, dur = 2, 1, 4.0
         sr = 3
         audio = 10.0 * get_batch_white_noise(b, c, int(sr * dur))
-        norm_audio = normalize_audio(audio, strategy='clip')
+        norm_audio = normalize_audio(audio, strategy="clip")
         assert norm_audio.abs().max() <= 1
 
     def test_normalize_audio_rms(self):
-        b, c, dur = 2, 1, 4.
+        b, c, dur = 2, 1, 4.0
         sr = 3
         audio = 10.0 * get_batch_white_noise(b, c, int(sr * dur))
-        norm_audio = normalize_audio(audio, strategy='rms')
+        norm_audio = normalize_audio(audio, strategy="rms")
         assert norm_audio.abs().max() <= 1
 
     def test_normalize_audio_peak(self):
-        b, c, dur = 2, 1, 4.
+        b, c, dur = 2, 1, 4.0
         sr = 3
         audio = 10.0 * get_batch_white_noise(b, c, int(sr * dur))
-        norm_audio = normalize_audio(audio, strategy='peak')
+        norm_audio = normalize_audio(audio, strategy="peak")
         assert norm_audio.abs().max() <= 1

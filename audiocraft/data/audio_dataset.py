@@ -42,7 +42,8 @@ class BaseInfo:
     def _dict2fields(cls, dictionary: dict):
         return {
             field.name: dictionary[field.name]
-            for field in fields(cls) if field.name in dictionary
+            for field in fields(cls)
+            if field.name in dictionary
         }
 
     @classmethod
@@ -51,10 +52,7 @@ class BaseInfo:
         return cls(**_dictionary)
 
     def to_dict(self):
-        return {
-            field.name: self.__getattribute__(field.name)
-            for field in fields(self)
-            }
+        return {field.name: self.__getattribute__(field.name) for field in fields(self)}
 
 
 @dataclass(order=True)
@@ -70,14 +68,14 @@ class AudioMeta(BaseInfo):
     @classmethod
     def from_dict(cls, dictionary: dict):
         base = cls._dict2fields(dictionary)
-        if 'info_path' in base and base['info_path'] is not None:
-            base['info_path'] = PathInZip(base['info_path'])
+        if "info_path" in base and base["info_path"] is not None:
+            base["info_path"] = PathInZip(base["info_path"])
         return cls(**base)
 
     def to_dict(self):
         d = super().to_dict()
-        if d['info_path'] is not None:
-            d['info_path'] = str(d['info_path'])
+        if d["info_path"] is not None:
+            d["info_path"] = str(d["info_path"])
         return d
 
 
@@ -87,13 +85,13 @@ class SegmentInfo(BaseInfo):
     seek_time: float
     # The following values are given once the audio is processed, e.g.
     # at the target sample rate and target number of channels.
-    n_frames: int      # actual number of frames without padding
+    n_frames: int  # actual number of frames without padding
     total_frames: int  # total number of frames, padding included
-    sample_rate: int   # actual sample rate
-    channels: int      # number of audio channels.
+    sample_rate: int  # actual sample rate
+    channels: int  # number of audio channels.
 
 
-DEFAULT_EXTS = ['.wav', '.mp3', '.flac', '.ogg', '.m4a']
+DEFAULT_EXTS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
 
 logger = logging.getLogger(__name__)
 
@@ -126,9 +124,10 @@ def _resolve_audio_meta(m: AudioMeta, fast: bool = True) -> AudioMeta:
     Returns:
         AudioMeta: Audio meta with resolved path.
     """
+
     def is_abs(m):
         if fast:
-            return str(m)[0] == '/'
+            return str(m)[0] == "/"
         else:
             os.path.isabs(str(m))
 
@@ -142,12 +141,14 @@ def _resolve_audio_meta(m: AudioMeta, fast: bool = True) -> AudioMeta:
     return m
 
 
-def find_audio_files(path: tp.Union[Path, str],
-                     exts: tp.List[str] = DEFAULT_EXTS,
-                     resolve: bool = True,
-                     minimal: bool = True,
-                     progress: bool = False,
-                     workers: int = 0) -> tp.List[AudioMeta]:
+def find_audio_files(
+    path: tp.Union[Path, str],
+    exts: tp.List[str] = DEFAULT_EXTS,
+    resolve: bool = True,
+    minimal: bool = True,
+    progress: bool = False,
+    workers: int = 0,
+) -> tp.List[AudioMeta]:
     """Build a list of AudioMeta from a given path,
     collecting relevant audio files and fetching meta info.
 
@@ -176,9 +177,13 @@ def find_audio_files(path: tp.Union[Path, str],
                 if full_path.suffix.lower() in exts:
                     audio_files.append(full_path)
                     if pool is not None:
-                        futures.append(pool.submit(_get_audio_meta, str(audio_files[-1]), minimal))
+                        futures.append(
+                            pool.submit(_get_audio_meta, str(audio_files[-1]), minimal)
+                        )
                     if progress:
-                        print(format(len(audio_files), " 8d"), end='\r', file=sys.stderr)
+                        print(
+                            format(len(audio_files), " 8d"), end="\r", file=sys.stderr
+                        )
 
         if progress:
             print("Getting audio metadata...")
@@ -196,13 +201,18 @@ def find_audio_files(path: tp.Union[Path, str],
                 continue
             meta.append(m)
             if progress:
-                print(format((1 + idx) / len(audio_files), " 3.1%"), end='\r', file=sys.stderr)
+                print(
+                    format((1 + idx) / len(audio_files), " 3.1%"),
+                    end="\r",
+                    file=sys.stderr,
+                )
     meta.sort()
     return meta
 
 
-def load_audio_meta(path: tp.Union[str, Path],
-                    resolve: bool = True, fast: bool = True) -> tp.List[AudioMeta]:
+def load_audio_meta(
+    path: tp.Union[str, Path], resolve: bool = True, fast: bool = True
+) -> tp.List[AudioMeta]:
     """Load list of AudioMeta from an optionally compressed json file.
 
     Args:
@@ -212,8 +222,8 @@ def load_audio_meta(path: tp.Union[str, Path],
     Returns:
         list of AudioMeta: List of audio file path and its total duration.
     """
-    open_fn = gzip.open if str(path).lower().endswith('.gz') else open
-    with open_fn(path, 'rb') as fp:  # type: ignore
+    open_fn = gzip.open if str(path).lower().endswith(".gz") else open
+    with open_fn(path, "rb") as fp:  # type: ignore
         lines = fp.readlines()
     meta = []
     for line in lines:
@@ -233,11 +243,11 @@ def save_audio_meta(path: tp.Union[str, Path], meta: tp.List[AudioMeta]):
         metadata (list of BaseAudioMeta): List of audio meta to save.
     """
     Path(path).parent.mkdir(exist_ok=True, parents=True)
-    open_fn = gzip.open if str(path).lower().endswith('.gz') else open
-    with open_fn(path, 'wb') as fp:  # type: ignore
+    open_fn = gzip.open if str(path).lower().endswith(".gz") else open
+    with open_fn(path, "wb") as fp:  # type: ignore
         for m in meta:
-            json_str = json.dumps(m.to_dict()) + '\n'
-            json_bytes = json_str.encode('utf-8')
+            json_str = json.dumps(m.to_dict()) + "\n"
+            json_bytes = json_str.encode("utf-8")
             fp.write(json_bytes)
 
 
@@ -292,26 +302,30 @@ class AudioDataset:
             that `num_samples = total_batch_size * num_updates_per_epoch`, with
             `total_batch_size` the overall batch size accounting for all gpus.
     """
-    def __init__(self,
-                 meta: tp.List[AudioMeta],
-                 segment_duration: tp.Optional[float] = None,
-                 shuffle: bool = True,
-                 num_samples: int = 10_000,
-                 sample_rate: int = 48_000,
-                 channels: int = 2,
-                 pad: bool = True,
-                 sample_on_duration: bool = True,
-                 sample_on_weight: bool = True,
-                 min_segment_ratio: float = 0.5,
-                 max_read_retry: int = 10,
-                 return_info: bool = False,
-                 min_audio_duration: tp.Optional[float] = None,
-                 max_audio_duration: tp.Optional[float] = None,
-                 shuffle_seed: int = 0,
-                 load_wav: bool = True,
-                 permutation_on_files: bool = False,
-                 ):
-        assert len(meta) > 0, "No audio meta provided to AudioDataset. Please check loading of audio meta."
+
+    def __init__(
+        self,
+        meta: tp.List[AudioMeta],
+        segment_duration: tp.Optional[float] = None,
+        shuffle: bool = True,
+        num_samples: int = 10_000,
+        sample_rate: int = 48_000,
+        channels: int = 2,
+        pad: bool = True,
+        sample_on_duration: bool = True,
+        sample_on_weight: bool = True,
+        min_segment_ratio: float = 0.5,
+        max_read_retry: int = 10,
+        return_info: bool = False,
+        min_audio_duration: tp.Optional[float] = None,
+        max_audio_duration: tp.Optional[float] = None,
+        shuffle_seed: int = 0,
+        load_wav: bool = True,
+        permutation_on_files: bool = False,
+    ):
+        assert (
+            len(meta) > 0
+        ), "No audio meta provided to AudioDataset. Please check loading of audio meta."
         assert segment_duration is None or segment_duration > 0
         assert segment_duration is None or min_segment_ratio >= 0
         self.segment_duration = segment_duration
@@ -357,7 +371,7 @@ class AudioDataset:
         """Return the sampling probabilities for each file inside `self.meta`."""
         scores: tp.List[float] = []
         for file_meta in self.meta:
-            score = 1.
+            score = 1.0
             if self.sample_on_weight and file_meta.weight is not None:
                 score *= file_meta.weight
             if self.sample_on_duration:
@@ -390,14 +404,21 @@ class AudioDataset:
             permutation_index = total_index // len(self.meta)
             relative_index = total_index % len(self.meta)
             permutation = AudioDataset._get_file_permutation(
-                len(self.meta), permutation_index, self.shuffle_seed)
+                len(self.meta), permutation_index, self.shuffle_seed
+            )
             file_index = permutation[relative_index]
             return self.meta[file_index]
 
         if not self.sample_on_weight and not self.sample_on_duration:
-            file_index = int(torch.randint(len(self.sampling_probabilities), (1,), generator=rng).item())
+            file_index = int(
+                torch.randint(
+                    len(self.sampling_probabilities), (1,), generator=rng
+                ).item()
+            )
         else:
-            file_index = int(torch.multinomial(self.sampling_probabilities, 1, generator=rng).item())
+            file_index = int(
+                torch.multinomial(self.sampling_probabilities, 1, generator=rng).item()
+            )
 
         return self.meta[file_index]
 
@@ -410,14 +431,22 @@ class AudioDataset:
             n_frames = int(self.sample_rate * self.segment_duration)
             return torch.zeros(self.channels, n_frames), self.sample_rate
 
-    def __getitem__(self, index: int) -> tp.Union[torch.Tensor, tp.Tuple[torch.Tensor, SegmentInfo]]:
+    def __getitem__(
+        self, index: int
+    ) -> tp.Union[torch.Tensor, tp.Tuple[torch.Tensor, SegmentInfo]]:
         if self.segment_duration is None:
             file_meta = self.meta[index]
             out, sr = audio_read(file_meta.path)
             out = convert_audio(out, sr, self.sample_rate, self.channels)
             n_frames = out.shape[-1]
-            segment_info = SegmentInfo(file_meta, seek_time=0., n_frames=n_frames, total_frames=n_frames,
-                                       sample_rate=self.sample_rate, channels=out.shape[0])
+            segment_info = SegmentInfo(
+                file_meta,
+                seek_time=0.0,
+                n_frames=n_frames,
+                total_frames=n_frames,
+                sample_rate=self.sample_rate,
+                channels=out.shape[0],
+            )
         else:
             rng = torch.Generator()
             if self.shuffle:
@@ -426,7 +455,10 @@ class AudioDataset:
                 if self.current_epoch is None:
                     rng.manual_seed(index + self.num_samples * random.randint(0, 2**24))
                 else:
-                    rng.manual_seed(index + self.num_samples * (self.current_epoch + self.shuffle_seed))
+                    rng.manual_seed(
+                        index
+                        + self.num_samples * (self.current_epoch + self.shuffle_seed)
+                    )
             else:
                 # We only use index
                 rng.manual_seed(index)
@@ -435,17 +467,28 @@ class AudioDataset:
                 file_meta = self.sample_file(index, rng)
                 # We add some variance in the file position even if audio file is smaller than segment
                 # without ending up with empty segments
-                max_seek = max(0, file_meta.duration - self.segment_duration * self.min_segment_ratio)
+                max_seek = max(
+                    0,
+                    file_meta.duration - self.segment_duration * self.min_segment_ratio,
+                )
                 seek_time = torch.rand(1, generator=rng).item() * max_seek
                 try:
-                    out, sr = audio_read(file_meta.path, seek_time, self.segment_duration, pad=False)
+                    out, sr = audio_read(
+                        file_meta.path, seek_time, self.segment_duration, pad=False
+                    )
                     out = convert_audio(out, sr, self.sample_rate, self.channels)
                     n_frames = out.shape[-1]
                     target_frames = int(self.segment_duration * self.sample_rate)
                     if self.pad:
                         out = F.pad(out, (0, target_frames - n_frames))
-                    segment_info = SegmentInfo(file_meta, seek_time, n_frames=n_frames, total_frames=target_frames,
-                                               sample_rate=self.sample_rate, channels=out.shape[0])
+                    segment_info = SegmentInfo(
+                        file_meta,
+                        seek_time,
+                        n_frames=n_frames,
+                        total_frames=target_frames,
+                        sample_rate=self.sample_rate,
+                        channels=out.shape[0],
+                    )
                 except Exception as exc:
                     logger.warning("Error opening file %s: %r", file_meta.path, exc)
                     if retry == self.max_read_retry - 1:
@@ -465,7 +508,9 @@ class AudioDataset:
         the samples of a batch.
         """
         if self.segment_duration is None and len(samples) > 1:
-            assert self.pad, "Must allow padding when batching examples of different durations."
+            assert (
+                self.pad
+            ), "Must allow padding when batching examples of different durations."
 
         # In this case the audio reaching the collater is of variable length as segment_duration=None.
         to_pad = self.segment_duration is None and self.pad
@@ -512,8 +557,11 @@ class AudioDataset:
             meta = [m for m in meta if m.duration <= self.max_audio_duration]
 
         filtered_len = len(meta)
-        removed_percentage = 100*(1-float(filtered_len)/orig_len)
-        msg = 'Removed %.2f percent of the data because it was too short or too long.' % removed_percentage
+        removed_percentage = 100 * (1 - float(filtered_len) / orig_len)
+        msg = (
+            "Removed %.2f percent of the data because it was too short or too long."
+            % removed_percentage
+        )
         if removed_percentage < 10:
             logging.debug(msg)
         else:
@@ -530,19 +578,26 @@ class AudioDataset:
         """
         root = Path(root)
         if root.is_dir():
-            if (root / 'data.jsonl').exists():
-                root = root / 'data.jsonl'
-            elif (root / 'data.jsonl.gz').exists():
-                root = root / 'data.jsonl.gz'
+            if (root / "data.jsonl").exists():
+                root = root / "data.jsonl"
+            elif (root / "data.jsonl.gz").exists():
+                root = root / "data.jsonl.gz"
             else:
-                raise ValueError("Don't know where to read metadata from in the dir. "
-                                 "Expecting either a data.jsonl or data.jsonl.gz file but none found.")
+                raise ValueError(
+                    "Don't know where to read metadata from in the dir. "
+                    "Expecting either a data.jsonl or data.jsonl.gz file but none found."
+                )
         meta = load_audio_meta(root)
         return cls(meta, **kwargs)
 
     @classmethod
-    def from_path(cls, root: tp.Union[str, Path], minimal_meta: bool = True,
-                  exts: tp.List[str] = DEFAULT_EXTS, **kwargs):
+    def from_path(
+        cls,
+        root: tp.Union[str, Path],
+        minimal_meta: bool = True,
+        exts: tp.List[str] = DEFAULT_EXTS,
+        **kwargs,
+    ):
         """Instantiate AudioDataset from a path containing (possibly nested) audio files.
 
         Args:
@@ -562,26 +617,36 @@ class AudioDataset:
 def main():
     logging.basicConfig(stream=sys.stderr, level=logging.INFO)
     parser = argparse.ArgumentParser(
-        prog='audio_dataset',
-        description='Generate .jsonl files by scanning a folder.')
-    parser.add_argument('root', help='Root folder with all the audio files')
-    parser.add_argument('output_meta_file',
-                        help='Output file to store the metadata, ')
-    parser.add_argument('--complete',
-                        action='store_false', dest='minimal', default=True,
-                        help='Retrieve all metadata, even the one that are expansive '
-                             'to compute (e.g. normalization).')
-    parser.add_argument('--resolve',
-                        action='store_true', default=False,
-                        help='Resolve the paths to be absolute and with no symlinks.')
-    parser.add_argument('--workers',
-                        default=10, type=int,
-                        help='Number of workers.')
+        prog="audio_dataset", description="Generate .jsonl files by scanning a folder."
+    )
+    parser.add_argument("root", help="Root folder with all the audio files")
+    parser.add_argument("output_meta_file", help="Output file to store the metadata, ")
+    parser.add_argument(
+        "--complete",
+        action="store_false",
+        dest="minimal",
+        default=True,
+        help="Retrieve all metadata, even the one that are expansive "
+        "to compute (e.g. normalization).",
+    )
+    parser.add_argument(
+        "--resolve",
+        action="store_true",
+        default=False,
+        help="Resolve the paths to be absolute and with no symlinks.",
+    )
+    parser.add_argument("--workers", default=10, type=int, help="Number of workers.")
     args = parser.parse_args()
-    meta = find_audio_files(args.root, DEFAULT_EXTS, progress=True,
-                            resolve=args.resolve, minimal=args.minimal, workers=args.workers)
+    meta = find_audio_files(
+        args.root,
+        DEFAULT_EXTS,
+        progress=True,
+        resolve=args.resolve,
+        minimal=args.minimal,
+        workers=args.workers,
+    )
     save_audio_meta(args.output_meta_file, meta)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

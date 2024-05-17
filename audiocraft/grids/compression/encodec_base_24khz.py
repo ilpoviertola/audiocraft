@@ -18,11 +18,11 @@ from ...environment import AudioCraftEnvironment
 
 @CompressionExplorer
 def explorer(launcher):
-    partitions = AudioCraftEnvironment.get_slurm_partitions(['team', 'global'])
+    partitions = AudioCraftEnvironment.get_slurm_partitions(["team", "global"])
     launcher.slurm_(gpus=8, partition=partitions)
     # base causal EnCodec trained on monophonic audio sampled at 24 kHz
-    launcher.bind_(solver='compression/encodec_base_24khz')
+    launcher.bind_(solver="compression/encodec_base_24khz")
     # replace this by the desired dataset
-    launcher.bind_(dset='audio/example')
+    launcher.bind_(dset="audio/example")
     # launch xp
     launcher()

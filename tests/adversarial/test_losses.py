@@ -27,7 +27,11 @@ class TestAdversarialLoss:
             adv.parameters(),
             lr=1e-4,
         )
-        loss, loss_real, loss_fake = get_adv_criterion('mse'), get_real_criterion('mse'), get_fake_criterion('mse')
+        loss, loss_real, loss_fake = (
+            get_adv_criterion("mse"),
+            get_real_criterion("mse"),
+            get_fake_criterion("mse"),
+        )
         adv_loss = AdversarialLoss(adv, optimizer, loss, loss_real, loss_fake)
 
         B, C, T = 4, 1, random.randint(1000, 5000)
@@ -35,12 +39,14 @@ class TestAdversarialLoss:
         fake = torch.randn(B, C, T)
 
         disc_loss = adv_loss.train_adv(fake, real)
-        assert isinstance(disc_loss, torch.Tensor) and isinstance(disc_loss.item(), float)
+        assert isinstance(disc_loss, torch.Tensor) and isinstance(
+            disc_loss.item(), float
+        )
 
         loss, loss_feat = adv_loss(fake, real)
         assert isinstance(loss, torch.Tensor) and isinstance(loss.item(), float)
         # we did not specify feature loss
-        assert loss_feat.item() == 0.
+        assert loss_feat.item() == 0.0
 
     def test_adversarial_feat_loss(self):
         adv = MultiScaleDiscriminator()
@@ -48,9 +54,15 @@ class TestAdversarialLoss:
             adv.parameters(),
             lr=1e-4,
         )
-        loss, loss_real, loss_fake = get_adv_criterion('mse'), get_real_criterion('mse'), get_fake_criterion('mse')
+        loss, loss_real, loss_fake = (
+            get_adv_criterion("mse"),
+            get_real_criterion("mse"),
+            get_fake_criterion("mse"),
+        )
         feat_loss = FeatureMatchingLoss()
-        adv_loss = AdversarialLoss(adv, optimizer, loss, loss_real, loss_fake, feat_loss)
+        adv_loss = AdversarialLoss(
+            adv, optimizer, loss, loss_real, loss_fake, feat_loss
+        )
 
         B, C, T = 4, 1, random.randint(1000, 5000)
         real = torch.randn(B, C, T)
@@ -65,7 +77,7 @@ class TestAdversarialLoss:
 class TestGeneratorAdversarialLoss:
 
     def test_hinge_generator_adv_loss(self):
-        adv_loss = get_adv_criterion(loss_type='hinge')
+        adv_loss = get_adv_criterion(loss_type="hinge")
 
         t0 = torch.randn(1, 2, 0)
         t1 = torch.FloatTensor([1.0, 2.0, 3.0])
@@ -74,7 +86,7 @@ class TestGeneratorAdversarialLoss:
         assert adv_loss(t1).item() == -2.0
 
     def test_mse_generator_adv_loss(self):
-        adv_loss = get_adv_criterion(loss_type='mse')
+        adv_loss = get_adv_criterion(loss_type="mse")
 
         t0 = torch.randn(1, 2, 0)
         t1 = torch.FloatTensor([1.0, 1.0, 1.0])
@@ -95,7 +107,7 @@ class TestDiscriminatorAdversarialLoss:
         return loss
 
     def test_hinge_discriminator_adv_loss(self):
-        loss_type = 'hinge'
+        loss_type = "hinge"
         t0 = torch.FloatTensor([0.0, 0.0, 0.0])
         t1 = torch.FloatTensor([1.0, 2.0, 3.0])
 
@@ -103,7 +115,7 @@ class TestDiscriminatorAdversarialLoss:
         assert self._disc_loss(loss_type, t1, t1).item() == 3.0
 
     def test_mse_discriminator_adv_loss(self):
-        loss_type = 'mse'
+        loss_type = "mse"
 
         t0 = torch.FloatTensor([0.0, 0.0, 0.0])
         t1 = torch.FloatTensor([1.0, 1.0, 1.0])

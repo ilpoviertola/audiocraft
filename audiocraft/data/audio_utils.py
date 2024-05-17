@@ -42,20 +42,28 @@ def convert_audio_channels(wav: torch.Tensor, channels: int = 2) -> torch.Tensor
         wav = wav[..., :channels, :]
     else:
         # Case 4: What is a reasonable choice here?
-        raise ValueError('The audio file has less channels than requested but is not mono.')
+        raise ValueError(
+            "The audio file has less channels than requested but is not mono."
+        )
     return wav
 
 
-def convert_audio(wav: torch.Tensor, from_rate: float,
-                  to_rate: float, to_channels: int) -> torch.Tensor:
+def convert_audio(
+    wav: torch.Tensor, from_rate: float, to_rate: float, to_channels: int
+) -> torch.Tensor:
     """Convert audio to new sample rate and number of audio channels."""
     wav = julius.resample_frac(wav, int(from_rate), int(to_rate))
     wav = convert_audio_channels(wav, to_channels)
     return wav
 
 
-def normalize_loudness(wav: torch.Tensor, sample_rate: int, loudness_headroom_db: float = 14,
-                       loudness_compressor: bool = False, energy_floor: float = 2e-3):
+def normalize_loudness(
+    wav: torch.Tensor,
+    sample_rate: int,
+    loudness_headroom_db: float = 14,
+    loudness_compressor: bool = False,
+    energy_floor: float = 2e-3,
+):
     """Normalize an input signal to a user loudness in dB LKFS.
     Audio loudness is defined according to the ITU-R BS.1770-4 recommendation.
 
@@ -83,22 +91,35 @@ def normalize_loudness(wav: torch.Tensor, sample_rate: int, loudness_headroom_db
     return output
 
 
-def _clip_wav(wav: torch.Tensor, log_clipping: bool = False, stem_name: tp.Optional[str] = None) -> None:
+def _clip_wav(
+    wav: torch.Tensor, log_clipping: bool = False, stem_name: tp.Optional[str] = None
+) -> None:
     """Utility function to clip the audio with logging if specified."""
     max_scale = wav.abs().max()
     if log_clipping and max_scale > 1:
         clamp_prob = (wav.abs() > 1).float().mean().item()
-        print(f"CLIPPING {stem_name or ''} happening with proba (a bit of clipping is okay):",
-              clamp_prob, "maximum scale: ", max_scale.item(), file=sys.stderr)
+        print(
+            f"CLIPPING {stem_name or ''} happening with proba (a bit of clipping is okay):",
+            clamp_prob,
+            "maximum scale: ",
+            max_scale.item(),
+            file=sys.stderr,
+        )
     wav.clamp_(-1, 1)
 
 
-def normalize_audio(wav: torch.Tensor, normalize: bool = True,
-                    strategy: str = 'peak', peak_clip_headroom_db: float = 1,
-                    rms_headroom_db: float = 18, loudness_headroom_db: float = 14,
-                    loudness_compressor: bool = False, log_clipping: bool = False,
-                    sample_rate: tp.Optional[int] = None,
-                    stem_name: tp.Optional[str] = None) -> torch.Tensor:
+def normalize_audio(
+    wav: torch.Tensor,
+    normalize: bool = True,
+    strategy: str = "peak",
+    peak_clip_headroom_db: float = 1,
+    rms_headroom_db: float = 18,
+    loudness_headroom_db: float = 14,
+    loudness_compressor: bool = False,
+    log_clipping: bool = False,
+    sample_rate: tp.Optional[int] = None,
+    stem_name: tp.Optional[str] = None,
+) -> torch.Tensor:
     """Normalize the audio according to the prescribed strategy (see after).
 
     Args:
@@ -123,31 +144,34 @@ def normalize_audio(wav: torch.Tensor, normalize: bool = True,
     """
     scale_peak = 10 ** (-peak_clip_headroom_db / 20)
     scale_rms = 10 ** (-rms_headroom_db / 20)
-    if strategy == 'peak':
-        rescaling = (scale_peak / wav.abs().max())
+    if strategy == "peak":
+        rescaling = scale_peak / wav.abs().max()
         if normalize or rescaling < 1:
             wav = wav * rescaling
-    elif strategy == 'clip':
+    elif strategy == "clip":
         wav = wav.clamp(-scale_peak, scale_peak)
-    elif strategy == 'rms':
+    elif strategy == "rms":
         mono = wav.mean(dim=0)
         rescaling = scale_rms / mono.pow(2).mean().sqrt()
         if normalize or rescaling < 1:
             wav = wav * rescaling
         _clip_wav(wav, log_clipping=log_clipping, stem_name=stem_name)
-    elif strategy == 'loudness':
+    elif strategy == "loudness":
         assert sample_rate is not None, "Loudness normalization requires sample rate."
-        wav = normalize_loudness(wav, sample_rate, loudness_headroom_db, loudness_compressor)
+        wav = normalize_loudness(
+            wav, sample_rate, loudness_headroom_db, loudness_compressor
+        )
         _clip_wav(wav, log_clipping=log_clipping, stem_name=stem_name)
     else:
         assert wav.abs().max() < 1
-        assert strategy == '' or strategy == 'none', f"Unexpected strategy: '{strategy}'"
+        assert (
+            strategy == "" or strategy == "none"
+        ), f"Unexpected strategy: '{strategy}'"
     return wav
 
 
 def f32_pcm(wav: torch.Tensor) -> torch.Tensor:
-    """Convert audio to float 32 bits PCM format.
-    """
+    """Convert audio to float 32 bits PCM format."""
     if wav.dtype.is_floating_point:
         return wav
     elif wav.dtype == torch.int16:
@@ -167,9 +191,9 @@ def i16_pcm(wav: torch.Tensor) -> torch.Tensor:
     """
     if wav.dtype.is_floating_point:
         assert wav.abs().max() <= 1
-        candidate = (wav * 2 ** 15).round()
-        if candidate.max() >= 2 ** 15:  # clipping would occur
-            candidate = (wav * (2 ** 15 - 1)).round()
+        candidate = (wav * 2**15).round()
+        if candidate.max() >= 2**15:  # clipping would occur
+            candidate = (wav * (2**15 - 1)).round()
         return candidate.short()
     else:
         assert wav.dtype == torch.int16

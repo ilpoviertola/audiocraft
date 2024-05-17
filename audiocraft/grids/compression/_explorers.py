@@ -16,8 +16,7 @@ class CompressionExplorer(BaseExplorer):
         return ["train", "valid", "evaluate"]
 
     def get_grid_meta(self):
-        """Returns the list of Meta information to display for each XP/job.
-        """
+        """Returns the list of Meta information to display for each XP/job."""
         return [
             tt.leaf("index", align=">"),
             tt.leaf("name", wrap=140),
@@ -26,8 +25,7 @@ class CompressionExplorer(BaseExplorer):
         ]
 
     def get_grid_metrics(self):
-        """Return the metrics that should be displayed in the tracking table.
-        """
+        """Return the metrics that should be displayed in the tracking table."""
         return [
             tt.group(
                 "train",
@@ -50,6 +48,8 @@ class CompressionExplorer(BaseExplorer):
                 align=">",
             ),
             tt.group(
-                "evaluate", [tt.leaf(name, ".3f") for name in self.eval_metrics], align=">"
+                "evaluate",
+                [tt.leaf(name, ".3f") for name in self.eval_metrics],
+                align=">",
             ),
         ]

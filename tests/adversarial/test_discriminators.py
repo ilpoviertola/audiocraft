@@ -11,7 +11,7 @@ import torch
 from audiocraft.adversarial.discriminators import (
     MultiPeriodDiscriminator,
     MultiScaleDiscriminator,
-    MultiScaleSTFTDiscriminator
+    MultiScaleSTFTDiscriminator,
 )
 
 
@@ -36,7 +36,7 @@ class TestMultiScaleDiscriminator:
         N, C, T = 2, 2, random.randrange(1, 100_000)
         t0 = torch.randn(N, C, T)
 
-        scale_norms = ['weight_norm', 'weight_norm']
+        scale_norms = ["weight_norm", "weight_norm"]
         msd = MultiScaleDiscriminator(scale_norms=scale_norms, in_channels=C)
         logits, fmaps = msd(t0)
 
@@ -57,8 +57,13 @@ class TestMultiScaleStftDiscriminator:
         hop_lengths = [32, 64, 16]
         win_lengths = [128, 256, 64]
 
-        msstftd = MultiScaleSTFTDiscriminator(filters=n_filters, n_ffts=n_ffts, hop_lengths=hop_lengths,
-                                              win_lengths=win_lengths, in_channels=C)
+        msstftd = MultiScaleSTFTDiscriminator(
+            filters=n_filters,
+            n_ffts=n_ffts,
+            hop_lengths=hop_lengths,
+            win_lengths=win_lengths,
+            in_channels=C,
+        )
         logits, fmaps = msstftd(t0)
 
         assert len(logits) == len(n_ffts)

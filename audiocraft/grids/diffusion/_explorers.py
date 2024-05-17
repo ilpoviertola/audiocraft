@@ -16,8 +16,7 @@ class DiffusionExplorer(BaseExplorer):
         return ["train", "valid", "valid_ema", "evaluate", "evaluate_ema"]
 
     def get_grid_meta(self):
-        """Returns the list of Meta information to display for each XP/job.
-        """
+        """Returns the list of Meta information to display for each XP/job."""
         return [
             tt.leaf("index", align=">"),
             tt.leaf("name", wrap=140),
@@ -26,8 +25,7 @@ class DiffusionExplorer(BaseExplorer):
         ]
 
     def get_grid_metrics(self):
-        """Return the metrics that should be displayed in the tracking table.
-        """
+        """Return the metrics that should be displayed in the tracking table."""
         return [
             tt.group(
                 "train",
@@ -54,13 +52,25 @@ class DiffusionExplorer(BaseExplorer):
                 align=">",
             ),
             tt.group(
-                "evaluate", [tt.leaf("rvm", ".4f"), tt.leaf("rvm_0", ".4f"),
-                             tt.leaf("rvm_1", ".4f"), tt.leaf("rvm_2", ".4f"),
-                             tt.leaf("rvm_3", ".4f"), ], align=">"
+                "evaluate",
+                [
+                    tt.leaf("rvm", ".4f"),
+                    tt.leaf("rvm_0", ".4f"),
+                    tt.leaf("rvm_1", ".4f"),
+                    tt.leaf("rvm_2", ".4f"),
+                    tt.leaf("rvm_3", ".4f"),
+                ],
+                align=">",
             ),
             tt.group(
-                "evaluate_ema", [tt.leaf("rvm", ".4f"), tt.leaf("rvm_0", ".4f"),
-                                 tt.leaf("rvm_1", ".4f"), tt.leaf("rvm_2", ".4f"),
-                                 tt.leaf("rvm_3", ".4f")], align=">"
+                "evaluate_ema",
+                [
+                    tt.leaf("rvm", ".4f"),
+                    tt.leaf("rvm_0", ".4f"),
+                    tt.leaf("rvm_1", ".4f"),
+                    tt.leaf("rvm_2", ".4f"),
+                    tt.leaf("rvm_3", ".4f"),
+                ],
+                align=">",
             ),
         ]

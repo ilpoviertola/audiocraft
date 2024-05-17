@@ -9,8 +9,7 @@ import tempfile
 
 
 class TempDirMixin:
-    """Mixin to provide easy access to temp dir.
-    """
+    """Mixin to provide easy access to temp dir."""
 
     temp_dir_ = None
 

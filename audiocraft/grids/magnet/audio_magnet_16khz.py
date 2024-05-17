@@ -10,23 +10,23 @@ from ...environment import AudioCraftEnvironment
 
 @LMExplorer
 def explorer(launcher):
-    partitions = AudioCraftEnvironment.get_slurm_partitions(['team', 'global'])
+    partitions = AudioCraftEnvironment.get_slurm_partitions(["team", "global"])
     launcher.slurm_(gpus=32, partition=partitions)
-    launcher.bind_(solver='magnet/audio_magnet_16khz')
+    launcher.bind_(solver="magnet/audio_magnet_16khz")
     # replace this by the desired environmental sound dataset
-    launcher.bind_(dset='internal/sounds_16khz')
+    launcher.bind_(dset="internal/sounds_16khz")
 
-    fsdp = {'autocast': False, 'fsdp.use': True}
-    medium = {'model/lm/model_scale': 'medium'}
+    fsdp = {"autocast": False, "fsdp.use": True}
+    medium = {"model/lm/model_scale": "medium"}
 
     # Small model (300M)
-    launcher.slurm_(gpus=32).bind_(label='32gpus')
+    launcher.slurm_(gpus=32).bind_(label="32gpus")
     with launcher.job_array():
         sub = launcher.bind()
         sub()
 
     # Medium model (1.5B)
-    launcher.slurm_(gpus=64).bind_(label='64gpus')
+    launcher.slurm_(gpus=64).bind_(label="64gpus")
     with launcher.job_array():
         sub = launcher.bind()
         sub(medium, fsdp)

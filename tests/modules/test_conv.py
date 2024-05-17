@@ -30,45 +30,45 @@ def test_get_extra_padding_for_conv1d():
 def test_pad1d_zeros():
     x = torch.randn(1, 1, 20)
 
-    xp1 = pad1d(x, (0, 5), mode='constant', value=0.)
+    xp1 = pad1d(x, (0, 5), mode="constant", value=0.0)
     assert xp1.shape[-1] == 25
-    xp2 = pad1d(x, (5, 5), mode='constant', value=0.)
+    xp2 = pad1d(x, (5, 5), mode="constant", value=0.0)
     assert xp2.shape[-1] == 30
-    xp3 = pad1d(x, (0, 0), mode='constant', value=0.)
+    xp3 = pad1d(x, (0, 0), mode="constant", value=0.0)
     assert xp3.shape[-1] == 20
-    xp4 = pad1d(x, (10, 30), mode='constant', value=0.)
+    xp4 = pad1d(x, (10, 30), mode="constant", value=0.0)
     assert xp4.shape[-1] == 60
 
     with pytest.raises(AssertionError):
-        pad1d(x, (-1, 0), mode='constant', value=0.)
+        pad1d(x, (-1, 0), mode="constant", value=0.0)
 
     with pytest.raises(AssertionError):
-        pad1d(x, (0, -1), mode='constant', value=0.)
+        pad1d(x, (0, -1), mode="constant", value=0.0)
 
     with pytest.raises(AssertionError):
-        pad1d(x, (-1, -1), mode='constant', value=0.)
+        pad1d(x, (-1, -1), mode="constant", value=0.0)
 
 
 def test_pad1d_reflect():
     x = torch.randn(1, 1, 20)
 
-    xp1 = pad1d(x, (0, 5), mode='reflect', value=0.)
+    xp1 = pad1d(x, (0, 5), mode="reflect", value=0.0)
     assert xp1.shape[-1] == 25
-    xp2 = pad1d(x, (5, 5), mode='reflect', value=0.)
+    xp2 = pad1d(x, (5, 5), mode="reflect", value=0.0)
     assert xp2.shape[-1] == 30
-    xp3 = pad1d(x, (0, 0), mode='reflect', value=0.)
+    xp3 = pad1d(x, (0, 0), mode="reflect", value=0.0)
     assert xp3.shape[-1] == 20
-    xp4 = pad1d(x, (10, 30), mode='reflect', value=0.)
+    xp4 = pad1d(x, (10, 30), mode="reflect", value=0.0)
     assert xp4.shape[-1] == 60
 
     with pytest.raises(AssertionError):
-        pad1d(x, (-1, 0), mode='reflect', value=0.)
+        pad1d(x, (-1, 0), mode="reflect", value=0.0)
 
     with pytest.raises(AssertionError):
-        pad1d(x, (0, -1), mode='reflect', value=0.)
+        pad1d(x, (0, -1), mode="reflect", value=0.0)
 
     with pytest.raises(AssertionError):
-        pad1d(x, (-1, -1), mode='reflect', value=0.)
+        pad1d(x, (-1, -1), mode="reflect", value=0.0)
 
 
 def test_unpad1d():
@@ -101,9 +101,9 @@ class TestNormConv1d:
 
         C_out, kernel_size, stride = 1, 4, 1
         expected_out_length = int((T - kernel_size) / stride + 1)
-        wn_conv = NormConv1d(C, 1, kernel_size=4, norm='weight_norm')
-        gn_conv = NormConv1d(C, 1, kernel_size=4, norm='time_group_norm')
-        nn_conv = NormConv1d(C, 1, kernel_size=4, norm='none')
+        wn_conv = NormConv1d(C, 1, kernel_size=4, norm="weight_norm")
+        gn_conv = NormConv1d(C, 1, kernel_size=4, norm="time_group_norm")
+        nn_conv = NormConv1d(C, 1, kernel_size=4, norm="none")
 
         assert isinstance(wn_conv.norm, nn.Identity)
         assert isinstance(wn_conv.conv, nn.Conv1d)
@@ -129,9 +129,15 @@ class TestNormConvTranspose1d:
         C_out, kernel_size, stride = 1, 4, 1
         expected_out_length = (T - 1) * stride + (kernel_size - 1) + 1
 
-        wn_convtr = NormConvTranspose1d(C, C_out, kernel_size=kernel_size, stride=stride, norm='weight_norm')
-        gn_convtr = NormConvTranspose1d(C, C_out, kernel_size=kernel_size, stride=stride, norm='time_group_norm')
-        nn_convtr = NormConvTranspose1d(C, C_out, kernel_size=kernel_size, stride=stride, norm='none')
+        wn_convtr = NormConvTranspose1d(
+            C, C_out, kernel_size=kernel_size, stride=stride, norm="weight_norm"
+        )
+        gn_convtr = NormConvTranspose1d(
+            C, C_out, kernel_size=kernel_size, stride=stride, norm="time_group_norm"
+        )
+        nn_convtr = NormConvTranspose1d(
+            C, C_out, kernel_size=kernel_size, stride=stride, norm="none"
+        )
 
         assert isinstance(wn_convtr.norm, nn.Identity)
         assert isinstance(wn_convtr.convtr, nn.ConvTranspose1d)
@@ -150,11 +156,15 @@ class TestNormConvTranspose1d:
 
 class TestStreamableConv1d:
 
-    def get_streamable_conv1d_output_length(self, length, kernel_size, stride, dilation):
+    def get_streamable_conv1d_output_length(
+        self, length, kernel_size, stride, dilation
+    ):
         # StreamableConv1d internally pads to make sure that the last window is full
         padding_total = (kernel_size - 1) * dilation - (stride - 1)
         n_frames = (length - kernel_size + padding_total) / stride + 1
-        ideal_length = (math.ceil(n_frames) - 1) * stride + (kernel_size - padding_total)
+        ideal_length = (math.ceil(n_frames) - 1) * stride + (
+            kernel_size - padding_total
+        )
         return ideal_length // stride
 
     def test_streamable_conv1d(self):
@@ -164,9 +174,20 @@ class TestStreamableConv1d:
 
         # conv params are [(kernel_size, stride, dilation)]
         conv_params = [(4, 1, 1), (4, 2, 1), (3, 1, 3), (10, 5, 1), (3, 2, 3)]
-        for causal, (kernel_size, stride, dilation) in product([False, True], conv_params):
-            expected_out_length = self.get_streamable_conv1d_output_length(T, kernel_size, stride, dilation)
-            sconv = StreamableConv1d(C, C_out, kernel_size=kernel_size, stride=stride, dilation=dilation, causal=causal)
+        for causal, (kernel_size, stride, dilation) in product(
+            [False, True], conv_params
+        ):
+            expected_out_length = self.get_streamable_conv1d_output_length(
+                T, kernel_size, stride, dilation
+            )
+            sconv = StreamableConv1d(
+                C,
+                C_out,
+                kernel_size=kernel_size,
+                stride=stride,
+                dilation=dilation,
+                causal=causal,
+            )
             out = sconv(t0)
             assert isinstance(out, torch.Tensor)
             print(list(out.shape), [N, C_out, expected_out_length])
@@ -176,7 +197,7 @@ class TestStreamableConv1d:
 class TestStreamableConvTranspose1d:
 
     def get_streamable_convtr1d_output_length(self, length, kernel_size, stride):
-        padding_total = (kernel_size - stride)
+        padding_total = kernel_size - stride
         return (length - 1) * stride - padding_total + (kernel_size - 1) + 1
 
     def test_streamable_convtr1d(self):
@@ -186,18 +207,34 @@ class TestStreamableConvTranspose1d:
         C_out = 1
 
         with pytest.raises(AssertionError):
-            StreamableConvTranspose1d(C, C_out, kernel_size=4, causal=False, trim_right_ratio=0.5)
-            StreamableConvTranspose1d(C, C_out, kernel_size=4, causal=True, trim_right_ratio=-1.)
-            StreamableConvTranspose1d(C, C_out, kernel_size=4, causal=True, trim_right_ratio=2)
+            StreamableConvTranspose1d(
+                C, C_out, kernel_size=4, causal=False, trim_right_ratio=0.5
+            )
+            StreamableConvTranspose1d(
+                C, C_out, kernel_size=4, causal=True, trim_right_ratio=-1.0
+            )
+            StreamableConvTranspose1d(
+                C, C_out, kernel_size=4, causal=True, trim_right_ratio=2
+            )
 
         # causal params are [(causal, trim_right)]
         causal_params = [(False, 1.0), (True, 1.0), (True, 0.5), (True, 0.0)]
         # conv params are [(kernel_size, stride)]
         conv_params = [(4, 1), (4, 2), (3, 1), (10, 5)]
-        for ((causal, trim_right_ratio), (kernel_size, stride)) in product(causal_params, conv_params):
-            expected_out_length = self.get_streamable_convtr1d_output_length(T, kernel_size, stride)
-            sconvtr = StreamableConvTranspose1d(C, C_out, kernel_size=kernel_size, stride=stride,
-                                                causal=causal, trim_right_ratio=trim_right_ratio)
+        for (causal, trim_right_ratio), (kernel_size, stride) in product(
+            causal_params, conv_params
+        ):
+            expected_out_length = self.get_streamable_convtr1d_output_length(
+                T, kernel_size, stride
+            )
+            sconvtr = StreamableConvTranspose1d(
+                C,
+                C_out,
+                kernel_size=kernel_size,
+                stride=stride,
+                causal=causal,
+                trim_right_ratio=trim_right_ratio,
+            )
             out = sconvtr(t0)
             assert isinstance(out, torch.Tensor)
             assert list(out.shape) == [N, C_out, expected_out_length]
