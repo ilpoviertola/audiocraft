@@ -38,6 +38,7 @@ class DatasetType(Enum):
     AUDIO = "audio"
     MUSIC = "music"
     SOUND = "sound"
+    VIDEO = "video"
 
 
 def get_solver(cfg: omegaconf.DictConfig) -> StandardSolver:
@@ -378,6 +379,7 @@ def get_audio_datasets(
         return_info = kwargs.pop("return_info")
         batch_size = kwargs.pop("batch_size", None)
         num_workers = kwargs.pop("num_workers")
+        _ = kwargs.pop("rand_transform_prob", None)
 
         if dataset_type == DatasetType.MUSIC:
             dataset = data.music_dataset.MusicDataset.from_meta(path, **kwargs)
@@ -385,6 +387,10 @@ def get_audio_datasets(
             dataset = data.sound_dataset.SoundDataset.from_meta(path, **kwargs)
         elif dataset_type == DatasetType.AUDIO:
             dataset = data.info_audio_dataset.InfoAudioDataset.from_meta(
+                path, return_info=return_info, **kwargs
+            )
+        elif dataset_type == DatasetType.VIDEO:
+            dataset = data.video_dataset.VideoDataset.from_meta(
                 path, return_info=return_info, **kwargs
             )
         else:

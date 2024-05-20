@@ -22,7 +22,6 @@ conditioners:
       name: vit_large
       finetune: false
       frame_dropout: 0.
-      normalize: false
       patch_size: 16
       pretrain_folder: /home/hdd/ilpo/checkpoints/jepa  # /scratch/project_2000936/viertoli/ckpts/jepa  # PUHTI
       checkpoint_name: vitl16.pth.tar

@@ -75,7 +75,7 @@ class VideoCondition(tp.NamedTuple):
     sample_rate: tp.List[int]
     path: tp.List[tp.Optional[str]] = []
     seek_time: tp.List[tp.Optional[float]] = []
-    clip_indices: tp.List[tp.Optional[tp.List[int]]] = []
+    clip_indices: tp.List[tp.Optional[tp.List[tp.List[int]]]] = []
 
 
 @dataclass
@@ -83,6 +83,7 @@ class ConditioningAttributes:
     text: tp.Dict[str, tp.Optional[str]] = field(default_factory=dict)
     wav: tp.Dict[str, WavCondition] = field(default_factory=dict)
     joint_embed: tp.Dict[str, JointEmbedCondition] = field(default_factory=dict)
+    video: tp.Dict[str, VideoCondition] = field(default_factory=dict)
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -100,11 +101,16 @@ class ConditioningAttributes:
         return self.joint_embed.keys()
 
     @property
+    def video_attributes(self):
+        return self.video.keys()
+
+    @property
     def attributes(self):
         return {
             "text": self.text_attributes,
             "wav": self.wav_attributes,
             "joint_embed": self.joint_embed_attributes,
+            "video": self.video_attributes,
         }
 
     def to_flat_dict(self):
@@ -112,6 +118,7 @@ class ConditioningAttributes:
             **{f"text.{k}": v for k, v in self.text.items()},
             **{f"wav.{k}": v for k, v in self.wav.items()},
             **{f"joint_embed.{k}": v for k, v in self.joint_embed.items()},
+            **{f"video.{k}": v for k, v in self.video.items()},
         }
 
     @classmethod
@@ -1285,7 +1292,6 @@ class VideoJepaConditioner(VideoConditioner):
         match_len_on_eval: bool = True,
         autocast_dtype: tp.Optional[str] = "float32",
         frame_dropout: float = 0.0,
-        normalize: bool = False,
         finetune: bool = False,
         attend_across_segments: bool = False,
         tag: tp.Optional[str] = None,
@@ -1365,14 +1371,6 @@ class VideoJepaConditioner(VideoConditioner):
         self.sample_rate = sample_rate
         self.embed_len = self._get_embed_len()
 
-        # self.normalize = normalize
-        # if self.normalize:
-        #     from torchvision.transforms.v2 import Normalize
-
-        #     self.normalizer = Normalize(
-        #         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        #     )
-
         self.cache = None
         if cache_path is not None:
             self.cache = EmbeddingCache(
@@ -1396,15 +1394,60 @@ class VideoJepaConditioner(VideoConditioner):
     def _extract_jepa_chunk(self, full_jepa: torch.Tensor, x: VideoCondition, idx: int):
         raise NotImplementedError("wip")
 
+    def _split_video_into_clips(
+        self,
+        video: torch.Tensor,
+        all_clip_indices: tp.List[tp.List[tp.List[int]]],
+        spatial_views: int = 1,
+    ):
+        """Split video into a list of clips"""
+        # TODO: fix this assumption (all videos should have same indices)
+        # all_clip_indices hold the incex numbers for the clips across all the videos in the batch
+        # however the clip indices should be the same for all the videos in the batch
+        clip_indices = all_clip_indices[0]
+        assert clip_indices is not None
+
+        all_clips = []
+        # TODO: add one nested list for different spatial views
+        # not really supported at the moment but V-JEPA expects this
+        # possible e.g. add different crops from same clip (same temporally but spatially different)
+        for c in clip_indices:
+            clips_per_view = []
+            for _ in range(spatial_views):
+                clips_per_view.append(
+                    video.index_select(2, torch.tensor(c, device=video.device))
+                )
+            all_clips.append(clips_per_view)
+        return all_clips
+
+    def _flatten_vis_feats(
+        self, vis_feats: torch.Tensor, B: int, S: int, Tv: int, D: int
+    ) -> torch.Tensor:
+        vis_feats_flattened = torch.empty(
+            B, Tv * S, D, dtype=vis_feats.dtype, device=vis_feats.device
+        )
+        for i in range(B):
+            for j in range(S):
+                vis_feats_flattened[i, Tv * j : Tv * (j + 1), :] = vis_feats[
+                    i + (j * B)
+                ]
+        return vis_feats_flattened
+
     @torch.no_grad()
     def _compute_video_embedding(
         self,
         video: torch.Tensor,
-        clip_indices: tp.List[tp.Optional[tp.List[int]]] = [],
+        clip_indices: tp.List[tp.Optional[tp.List[tp.List[int]]]],
     ) -> torch.Tensor:
-        clip_indices = clip_indices if len(clip_indices) > 0 else None  # type: ignore
+        # clip_indices = clip_indices if len(clip_indices) > 0 else None  # type: ignore
+        B, _, _, _, _ = video.shape
+        video = self._split_video_into_clips(video, clip_indices)  # type: ignore
         with self.autocast:
             embed = self.jepa(video, clip_indices)
+            # concatenate the clips that are from the same source video
+            S = len(video)
+            _, Tv, D = embed.shape
+            embed = self._flatten_vis_feats(embed, B, S, Tv, D)
             return embed
 
     @torch.no_grad()
@@ -1419,8 +1462,8 @@ class VideoJepaConditioner(VideoConditioner):
         # TODO: cache stuff
         else:
             assert all(
-                sr == x.sample_rate for sr in x.sample_rate
-            ), "All sample rates in batch should be equal."
+                sr == x.sample_rate[0] for sr in x.sample_rate
+            ), f"All sample rates in batch should be equal."
             embed = self._compute_video_embedding(x.video, x.clip_indices)
 
         if self.match_len_on_eval:
@@ -1641,6 +1684,16 @@ class ConditioningProvider(nn.Module):
     def has_wav_condition(self):
         return len(self.wav_conditions) > 0
 
+    @property
+    def video_conditions(self):
+        return [
+            k for k, v in self.conditioners.items() if isinstance(v, VideoConditioner)
+        ]
+
+    @property
+    def has_video_condition(self):
+        return len(self.video_conditions) > 0
+
     def tokenize(self, inputs: tp.List[ConditioningAttributes]) -> tp.Dict[str, tp.Any]:
         """Match attributes/wavs with existing conditioners in self, and compute tokenize them accordingly.
         This should be called before starting any real GPU work to avoid synchronization points.
@@ -1659,15 +1712,18 @@ class ConditioningProvider(nn.Module):
         text = self._collate_text(inputs)
         wavs = self._collate_wavs(inputs)
         joint_embeds = self._collate_joint_embeds(inputs)
+        videos = self._collate_videos(inputs)
 
-        assert set(text.keys() | wavs.keys() | joint_embeds.keys()).issubset(
-            set(self.conditioners.keys())
-        ), (
+        assert set(
+            text.keys() | wavs.keys() | joint_embeds.keys() | videos.keys()
+        ).issubset(set(self.conditioners.keys())), (
             f"Got an unexpected attribute! Expected {self.conditioners.keys()}, ",
             f"got {text.keys(), wavs.keys(), joint_embeds.keys()}",
         )
 
-        for attribute, batch in chain(text.items(), wavs.items(), joint_embeds.items()):
+        for attribute, batch in chain(
+            text.items(), wavs.items(), joint_embeds.items(), videos.items()
+        ):
             output[attribute] = self.conditioners[attribute].tokenize(batch)
         return output
 
@@ -1837,6 +1893,46 @@ class ConditioningProvider(nn.Module):
                 seek_time=stacked_seek_times,
             )
 
+        return out
+
+    def _collate_videos(
+        self, samples: tp.List[ConditioningAttributes]
+    ) -> tp.Dict[str, VideoCondition]:
+        videos = defaultdict(list)
+        lengths = defaultdict(list)
+        sample_rates = defaultdict(list)
+        paths = defaultdict(list)
+        seek_times = defaultdict(list)
+        clip_indices = defaultdict(list)
+
+        out = {}
+        for sample in samples:
+            for attribute in self.video_conditions:
+                video, length, sample_rate, path, seek_time, clip_index = sample.video[
+                    attribute
+                ]
+                videos[attribute].append(video)
+                lengths[attribute].append(length)
+                sample_rates[attribute].extend(sample_rate)
+                paths[attribute].extend(path)
+                seek_times[attribute].extend(seek_time)
+                clip_indices[attribute].extend(clip_index)
+
+        for attribute in self.video_conditions:
+            stacked_videos = pad_sequence(videos[attribute]).squeeze(0).to(self.device)
+            stacked_lengths = torch.cat(lengths[attribute]).to(self.device)
+            stacked_clip_indices = clip_indices[attribute]
+            stacked_sample_rates = sample_rates[attribute]
+            stacked_paths = paths[attribute]
+            stacked_seek_times = seek_times[attribute]
+            out[attribute] = VideoCondition(
+                video=stacked_videos,
+                length=stacked_lengths,
+                sample_rate=stacked_sample_rates,
+                path=stacked_paths,
+                seek_time=stacked_seek_times,
+                clip_indices=stacked_clip_indices,
+            )
         return out
 
 

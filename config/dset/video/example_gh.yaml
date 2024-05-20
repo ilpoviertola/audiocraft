@@ -1,0 +1,10 @@
+# @package __global__
+
+datasource:
+  max_sample_rate: 24000
+  max_channels: 2
+
+  train: egs/example_video_gh
+  valid: egs/example_video_gh
+  evaluate: egs/example_video_gh
+  generate: egs/example_video_gh

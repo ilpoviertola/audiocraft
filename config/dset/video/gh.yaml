@@ -1,0 +1,10 @@
+# @package __global__
+
+datasource:
+  max_sample_rate: 24000
+  max_channels: 2
+
+  train: egs/gh/h264_video_25fps_256side_24000hz_aac/train
+  valid: egs/gh/h264_video_25fps_256side_24000hz_aac/valid
+  evaluate: egs/gh/h264_video_25fps_256side_24000hz_aac/test
+  generate: egs/gh/h264_video_25fps_256side_24000hz_aac/test

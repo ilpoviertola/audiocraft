@@ -1,0 +1,141 @@
+# @package __global__
+
+# This is a minimal debugging configuration
+# for V2AGen training solver
+defaults:
+  - v2agen/default
+  - /model: lm/v2agen_lm
+  - override /model/lm/model_scale: small
+  - override /dset: video/gh
+  - _self_
+
+autocast: true
+autocast_dtype: float16
+
+compression_model_checkpoint: facebook/encodec_24kHz
+
+channels: 1
+sample_rate: 24000
+
+conditioners:
+  video:
+    jepa:
+      use_masking: false
+      sample_rate: 25
+      max_frames: 64
+      autocast_dtype: ${autocast_dtype}
+
+deadlock:
+  use: true  # deadlock detection
+
+dataset:
+  batch_size: 24
+  segment_duration: 2.56
+  sample_on_weight: false  # Uniform sampling all the way
+  sample_on_duration: false  # Uniform sampling all the way
+  clip_video: true
+  frames_per_clip: ${conditioners.video.jepa.patch_size}
+  max_frames: ${conditioners.video.jepa.max_frames}
+  frame_step: 1
+  train:
+    num_samples: 23389
+    rand_transform_prob: 0.5
+    video_transforms:
+      - target: torchvision.transforms.v2.Resize
+        params:
+          size: 256
+          antialias: true
+      - target: torchvision.transforms.v2.RandomCrop
+        params:
+          size: [224, 224]
+      - target: torchvision.transforms.v2.RandomHorizontalFlip
+        params:
+          p: ${dataset.train.rand_transform_prob}
+      - target: audiocraft.utils.transforms.ToFloat32DType
+      - target: torchvision.transforms.v2.Normalize
+        params:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+      - target: audiocraft.utils.transforms.Permute
+        params:
+          permutation: [1, 0, 2, 3]
+  valid:
+    num_samples: 2324
+    video_transforms:
+      - target: torchvision.transforms.v2.Resize
+        params:
+          size: 256
+          antialias: true
+      - target: torchvision.transforms.v2.CenterCrop
+        params:
+          size: [224, 224]
+      - target: audiocraft.utils.transforms.ToFloat32DType
+      - target: torchvision.transforms.v2.Normalize
+        params:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+      - target: audiocraft.utils.transforms.Permute
+        params:
+          permutation: [1, 0, 2, 3]
+  evaluate:
+    num_samples: 8452
+    video_transforms:
+      - target: torchvision.transforms.v2.Resize
+        params:
+          size: 256
+          antialias: true
+      - target: torchvision.transforms.v2.CenterCrop
+        params:
+          size: [224, 224]
+      - target: audiocraft.utils.transforms.ToFloat32DType
+      - target: torchvision.transforms.v2.Normalize
+        params:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+      - target: audiocraft.utils.transforms.Permute
+        params:
+          permutation: [1, 0, 2, 3]
+  generate:
+    num_samples: 8452
+    video_transforms:
+      - target: torchvision.transforms.v2.Resize
+        params:
+          size: 256
+          antialias: true
+      - target: torchvision.transforms.v2.CenterCrop
+        params:
+          size: [224, 224]
+      - target: audiocraft.utils.transforms.ToFloat32DType
+      - target: torchvision.transforms.v2.Normalize
+        params:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+      - target: audiocraft.utils.transforms.Permute
+        params:
+          permutation: [1, 0, 2, 3]
+
+generate:
+  lm:
+    use_sampling: true
+    top_k: 250
+    top_p: 0.0
+
+optim:
+  epochs: 20
+  updates_per_epoch: 2000
+  optimizer: adamw
+  lr: 0.000154 # exp(-0.4214*ln(N)-0.5535)
+  adam:
+    weight_decay: 1.54e-05 # lr * 0.1
+
+logging:
+  log_tensorboard: true
+tensorboard:
+  with_media_logging: true
+
+schedule:
+  lr_scheduler: cosine
+  cosine:
+    warmup: 2_000
+    lr_min_ratio: 0.1
+    cycle_length: 1.0
