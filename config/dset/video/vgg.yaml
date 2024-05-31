@@ -6,5 +6,5 @@ datasource:
 
   train: egs/vgg/h264_video_25fps_256side_24000hz_aac/train
   valid: egs/vgg/h264_video_25fps_256side_24000hz_aac/valid
-  evaluate: egs/vgg/h264_video_25fps_256side_24000hz_aac/test
-  generate: egs/vgg/h264_video_25fps_256side_24000hz_aac/test
+  evaluate: egs/vgg/h264_video_25fps_256side_24000hz_aac/sparse
+  generate: egs/vgg/h264_video_25fps_256side_24000hz_aac/sparse

@@ -16,6 +16,7 @@ import re
 import typing as tp
 import warnings
 
+import numpy as np
 import einops
 from num2words import num2words
 import spacy
@@ -167,6 +168,18 @@ def nullify_condition(condition: ConditionType, dim: int = 1):
     mask = torch.zeros((B, 1), device=out.device).int()
     assert cond.dim() == out.dim()
     return out, mask
+
+
+def nullify_video(cond: VideoCondition) -> VideoCondition:
+    null_video, _ = nullify_condition((cond.video, torch.zeros_like(cond.video)), dim=2)
+    return VideoCondition(
+        video=null_video.repeat(1, 1, 16, 1, 1),
+        length=torch.tensor([0] * cond.video.shape[0], device=cond.video.device),
+        sample_rate=cond.sample_rate,
+        path=[None] * cond.video.shape[0],
+        seek_time=[None] * cond.video.shape[0],
+        clip_indices=cond.clip_indices,
+    )
 
 
 def nullify_wav(cond: WavCondition) -> WavCondition:
@@ -1324,6 +1337,9 @@ class VideoJepaConditioner(VideoConditioner):
                 enabled=True, device_type=self.device, dtype=dtype
             )
         previous_level = logging.root.manager.disable
+        assert Path(
+            f"{pretrain_folder}/{checkpoint_name}"
+        ).exists(), f"Checkpoint {pretrain_folder}/{checkpoint_name} not found"
         logging.disable(logging.ERROR)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -1353,11 +1369,8 @@ class VideoJepaConditioner(VideoConditioner):
                 jepa = JEPAEncoderWrapper(**jepa_params).train(mode=finetune)  # type: ignore
             finally:
                 logging.disable(previous_level)
-        assert jepa.model.embed_dim == dim, "JEPA model dim should match dim"
-        assert Path(
-            f"{pretrain_folder}/{checkpoint_name}"
-        ).exists(), f"Pretrain folder {pretrain_folder} not found"
 
+        assert jepa.model.embed_dim == dim, "JEPA model dim should match dim"
         if finetune:
             self.jepa = jepa
         else:
@@ -1440,7 +1453,7 @@ class VideoJepaConditioner(VideoConditioner):
         clip_indices: tp.List[tp.Optional[tp.List[tp.List[int]]]],
     ) -> torch.Tensor:
         # clip_indices = clip_indices if len(clip_indices) > 0 else None  # type: ignore
-        B, _, _, _, _ = video.shape
+        B = video.shape[0]
         video = self._split_video_into_clips(video, clip_indices)  # type: ignore
         with self.autocast:
             embed = self.jepa(video, clip_indices)
@@ -1503,22 +1516,27 @@ def dropout_condition(
     If the condition is of any other type, set its value to None.
     Works in-place.
     """
-    if condition_type not in ["text", "wav", "joint_embed"]:
+    if condition_type not in ["text", "wav", "joint_embed", "video"]:
         raise ValueError(
             "dropout_condition got an unexpected condition type!"
-            f" expected 'text', 'wav' or 'joint_embed' but got '{condition_type}'"
+            f" expected 'text', 'wav', 'video' or 'joint_embed' but got '{condition_type}'"
         )
 
     if condition not in getattr(sample, condition_type):
         raise ValueError(
             "dropout_condition received an unexpected condition!"
-            f" expected wav={sample.wav.keys()} and text={sample.text.keys()}"
+            f" expected wav={sample.wav.keys()}, video={sample.video.keys()} and text={sample.text.keys()}"
             f" but got '{condition}' of type '{condition_type}'!"
         )
 
     if condition_type == "wav":
         wav_cond = sample.wav[condition]
         sample.wav[condition] = nullify_wav(wav_cond)
+    elif condition_type == "video":
+        if condition != "video":
+            return sample
+        video_cond = sample.video[condition]
+        sample.video[condition] = nullify_video(video_cond)
     elif condition_type == "joint_embed":
         embed = sample.joint_embed[condition]
         sample.joint_embed[condition] = nullify_joint_embed(embed)
@@ -1627,7 +1645,7 @@ class ClassifierFreeGuidanceDropout(DropoutModule):
 
         # nullify conditions of all attributes
         samples = deepcopy(samples)
-        for condition_type in ["wav", "text"]:
+        for condition_type in ["wav", "text", "video"]:
             for sample in samples:
                 for condition in sample.attributes[condition_type]:
                     dropout_condition(sample, condition_type, condition)

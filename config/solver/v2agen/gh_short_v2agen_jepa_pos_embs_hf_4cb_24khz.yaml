@@ -22,31 +22,31 @@ conditioners:
     jepa:
       use_masking: false
       sample_rate: 25
-      max_frames: 64
+      max_frames: 16
       autocast_dtype: ${autocast_dtype}
+      use_pos_embed: true
 
 deadlock:
   use: true  # deadlock detection
 
 transformer_lm:
-  n_q: 2
+  n_q: 4
 
 codebooks_pattern:
   modeling: delay
   delay:
-    delays: [0, 1]
+    delays: [0, 1, 2, 3]
     flatten_first: 0
     empty_initial: 0
 
 dataset:
   num_workers: 16
   batch_size: 48 # 2 gpus
-  segment_duration: 2.56
+  segment_duration: 0.64
   sample_on_weight: false  # Uniform sampling all the way
   sample_on_duration: false  # Uniform sampling all the way
   clip_video: true
   frames_per_clip: ${conditioners.video.jepa.patch_size}
-  # max_frames: ${conditioners.video.jepa.max_frames}
   frame_step: 1
   train:
     num_samples: 23389
@@ -126,13 +126,21 @@ dataset:
           permutation: [1, 0, 2, 3]
 
 generate:
+  every: 10
+  num_workers: 10
+  audio:
+    log_clipping: false
   lm:
+    prompted_samples: false
+    unprompted_samples: true
     use_sampling: true
     top_k: 250
     top_p: 0.0
+evaluate:
+  every: null
 
 optim:
-  epochs: 20
+  epochs: 60
   updates_per_epoch: 480
   optimizer: adamw
   lr: 0.000154 # exp(-0.4214*ln(N)-0.5535)

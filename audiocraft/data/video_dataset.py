@@ -97,7 +97,7 @@ class VideoDataset(InfoAudioDataset):
         aug_p: float = 0.0,
         clip_video: bool = True,
         frames_per_clip: int = 16,
-        max_frames: int = 64,
+        vfps: float = 25,
         frame_step: int = 1,
         video_transforms: tp.Optional[tp.List[tp.Dict[str, tp.Any]]] = None,
         **kwargs,
@@ -111,12 +111,19 @@ class VideoDataset(InfoAudioDataset):
         self.aug_p = aug_p
         self.clip_video = clip_video
         self.frames_per_clip = frames_per_clip
-        self.max_frames = max_frames
-        self.num_clips = max_frames // frames_per_clip
+        assert "segment_duration" in kwargs, "Segment duration must be provided."
+        self.max_frames = int(vfps * kwargs["segment_duration"])
+        self.num_clips = self.max_frames // frames_per_clip
         self.frame_step = frame_step
 
         self.video_transforms = (
             get_video_transforms(video_transforms) if video_transforms else None
+        )
+        logger.info(
+            "VideoDataset initalized with %d max frames, %d fpc, and %d clips per video",
+            self.max_frames,
+            self.frames_per_clip,
+            self.num_clips,
         )
 
     def _split_video_into_clips(self, video: torch.Tensor):

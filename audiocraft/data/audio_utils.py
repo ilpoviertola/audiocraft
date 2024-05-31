@@ -76,19 +76,28 @@ def normalize_loudness(
     Returns:
         torch.Tensor: Loudness normalized output data.
     """
-    energy = wav.pow(2).mean().sqrt().item()
-    if energy < energy_floor:
+    try:
+        energy = wav.pow(2).mean().sqrt().item()
+        if energy < energy_floor:
+            return wav
+        transform = torchaudio.transforms.Loudness(sample_rate)
+        input_loudness_db = transform(wav).item()
+        # calculate the gain needed to scale to the desired loudness level
+        delta_loudness = -loudness_headroom_db - input_loudness_db
+        gain = 10.0 ** (delta_loudness / 20.0)
+        output = gain * wav
+        if loudness_compressor:
+            output = torch.tanh(output)
+        assert output.isfinite().all(), (input_loudness_db, wav.pow(2).mean().sqrt())
+        return output
+    except Exception as e:
+        print(f"Error in normalize_loudness: {e}")
+        print("\twav.shape:", wav.shape)
+        print(
+            "\tinput_loudness_db:",
+            input_loudness_db if "input_loudness_db" in locals() else None,
+        )
         return wav
-    transform = torchaudio.transforms.Loudness(sample_rate)
-    input_loudness_db = transform(wav).item()
-    # calculate the gain needed to scale to the desired loudness level
-    delta_loudness = -loudness_headroom_db - input_loudness_db
-    gain = 10.0 ** (delta_loudness / 20.0)
-    output = gain * wav
-    if loudness_compressor:
-        output = torch.tanh(output)
-    assert output.isfinite().all(), (input_loudness_db, wav.pow(2).mean().sqrt())
-    return output
 
 
 def _clip_wav(

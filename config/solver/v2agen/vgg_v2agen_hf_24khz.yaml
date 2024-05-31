@@ -5,7 +5,7 @@
 defaults:
   - v2agen/default
   - /model: lm/v2agen_lm
-  - override /model/lm/model_scale: medium
+  - override /model/lm/model_scale: small
   - override /dset: video/vgg
   - _self_
 
@@ -28,14 +28,24 @@ conditioners:
 deadlock:
   use: true  # deadlock detection
 
+transformer_lm:
+  n_q: 8
+
+codebooks_pattern:
+  modeling: delay
+  delay:
+    delays: [0, 1, 2, 3, 4, 5, 6, 7]
+    flatten_first: 0
+    empty_initial: 0
+
 dataset:
-  batch_size: 16
+  batch_size: 48 # 2 gpus
   segment_duration: 5.12
   sample_on_weight: false  # Uniform sampling all the way
   sample_on_duration: false  # Uniform sampling all the way
   clip_video: true
   frames_per_clip: ${conditioners.video.jepa.patch_size}
-  max_frames: ${conditioners.video.jepa.max_frames}
+  # max_frames: ${conditioners.video.jepa.max_frames}
   frame_step: 1
   train:
     rand_transform_prob: 0.5
@@ -111,8 +121,6 @@ dataset:
           permutation: [1, 0, 2, 3]
 
 generate:
-  audio:
-    strategy: peak
   lm:
     use_sampling: true
     top_k: 250
@@ -128,6 +136,7 @@ optim:
 
 logging:
   log_tensorboard: true
+  log_updates: 200
 tensorboard:
   with_media_logging: true
 

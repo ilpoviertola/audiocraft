@@ -24,6 +24,24 @@ dataset:
   batch_size: 128
   segment_duration: 5
   min_segment_ratio: 1.0  # lower values such as 0.5 result in generations with a lot of silence.
+  vfps: ${conditioners.video.jepa.sample_rate}
+
+generate:
+  lm:
+    prompted_samples: false
+    unprompted_samples: true
+#     long_samples:
+#       generate: true
+#       duration: 4.48
+#       stride: null
+#       datasource:
+#         max_sample_rate: 24000
+#         max_channels: 2
+
+#         train: null
+#         valid: null
+#         evaluate: null
+#         generate_long: egs/gh/h264_video_25fps_256side_24000hz_aac/test_subset
 
 optim:
   epochs: 100

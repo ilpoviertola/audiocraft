@@ -6,5 +6,5 @@ datasource:
 
   train: egs/gh/h264_video_25fps_256side_24000hz_aac/train
   valid: egs/gh/h264_video_25fps_256side_24000hz_aac/valid
-  evaluate: egs/gh/h264_video_25fps_256side_24000hz_aac/test
-  generate: egs/gh/h264_video_25fps_256side_24000hz_aac/test
+  evaluate: egs/gh/h264_video_25fps_256side_24000hz_aac/test_subset
+  generate: egs/gh/h264_video_25fps_256side_24000hz_aac/test_subset

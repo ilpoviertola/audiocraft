@@ -22,7 +22,7 @@ conditioners:
     jepa:
       use_masking: false
       sample_rate: 25
-      max_frames: 64
+      max_frames: 16
       autocast_dtype: ${autocast_dtype}
 
 deadlock:
@@ -41,7 +41,7 @@ codebooks_pattern:
 dataset:
   num_workers: 16
   batch_size: 48 # 2 gpus
-  segment_duration: 2.56
+  segment_duration: 0.64
   sample_on_weight: false  # Uniform sampling all the way
   sample_on_duration: false  # Uniform sampling all the way
   clip_video: true
@@ -126,6 +126,8 @@ dataset:
           permutation: [1, 0, 2, 3]
 
 generate:
+  audio:
+    log_clipping: false
   lm:
     use_sampling: true
     top_k: 250

@@ -167,6 +167,7 @@ class ClipAggregation(nn.Module):
             agg_outputs = self.spatial_aggregation(all_outputs)
 
             if (self.pos_embed is not None) and (clip_indices is not None):
+                clip_indices = torch.tensor(clip_indices, device=outputs.device)
                 clip_indices = [c[:, :: self.tubelet_size] for c in clip_indices]
                 pos_embed = self.pos_embed.repeat(B, 1, 1)  # [B, F, D]
                 pos_embed = apply_masks(

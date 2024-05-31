@@ -59,6 +59,21 @@ def get_s3d_transforms_validation() -> Tv.Compose:
     )
 
 
+def get_jepa_transforms_validation() -> Tv.Compose:
+    return Tv.Compose(
+        [
+            v2.Resize(256, antialias=True),
+            v2.CenterCrop((224, 224)),
+            ToFloat32DType(),
+            v2.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
+            Permute([1, 0, 2, 3]),
+        ]
+    )
+
+
 class ToFloat32DType(torch.nn.Module):
     def __init__(self):
         super().__init__()
